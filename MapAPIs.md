@@ -17,4 +17,10 @@
 ### OpenData Dresden
 
 * [openData Dresden](https://opendata.dresden.de/DreiD/) looks promising
-* TODO: find framework for processing data-format (*WFS* or *WMS*)
+* [WMS API](https://en.wikipedia.org/wiki/Web_Map_Service):
+  * will serve map images
+* [WFS API](https://en.wikipedia.org/wiki/Web_Feature_Service):
+  * allows requesting geographical features (_source code_ of the map)
+  &rarr; enables spatial analysis
+* TODO: find python framework allowing to use *WFS* and/or *WMS* APIs
+
