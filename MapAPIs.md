@@ -22,5 +22,7 @@
 * [WFS API](https://en.wikipedia.org/wiki/Web_Feature_Service):
   * allows requesting geographical features (_source code_ of the map)
   &rarr; enables spatial analysis
-* TODO: find python framework allowing to use *WFS* and/or *WMS* APIs
+* Fetching data from WMS and WFS Servers:
+  * Option 1: request via URL (tedious)
+  * Option 2: use [OWSLib](http://geopython.github.io/OWSLib/)
 
