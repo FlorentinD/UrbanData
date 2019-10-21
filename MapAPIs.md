@@ -19,7 +19,7 @@
 * [openData Dresden](https://opendata.dresden.de/DreiD/) looks promising
 * [WMS API](https://en.wikipedia.org/wiki/Web_Map_Service):
   * will serve map images
-  * probably not useable if data should be included as a layer in an existing map
+  * _probably_ not useable if data should be included as a layer in an existing map (!investigate further!)
 * [WFS API](https://en.wikipedia.org/wiki/Web_Feature_Service):
   * allows requesting geographical features (_source code_ of the map)
   &rarr; enables spatial analysis
