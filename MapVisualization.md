@@ -4,6 +4,7 @@
   * zoom in/out
 
 ## Static Map
+* (Mapnik)[https://mapnik.org/]
 
 ## Slippy Map ? 
   * obviously more complex
