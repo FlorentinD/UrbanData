@@ -15,21 +15,22 @@
 
 * [osmapi](http://osmapi.metaodi.ch/)
   * low-lvl api (no support for search by location name f.i.)
-  * layers possible via using [<https://wiki.openstreetmap.org/wiki/Category:Features>](tag information)
+  * layers possible via using [tag information](<https://wiki.openstreetmap.org/wiki/Category:Features>)
     * free tagging system --> cummunity aggrees on certain combinations
-    * [<https://taginfo.openstreetmap.org/keys>](tag info project) 
+    * [tag info project](<https://taginfo.openstreetmap.org/keys>)
     * TODO: search for important tags / But may be too tedious (probably use other API)
   * limit of 50.000 nodes per request (Dresden has more --> only show specific areas?)
-  * or use [<https://www.openstreetmap.org/export#map=10/50.9891/14.1051&layers=H>](export function)
+  * or use [export function](https://www.openstreetmap.org/export#map=10/50.9891/14.1051&layers=H)
   * alternative use planet.osm (compressed size: 80 GB)
 
-* Overpass API 
-  * more advanced API
+* [Overpass API](<https://wiki.openstreetmap.org/wiki/Overpass_API>)
+  * more advanced API [extra query language (OverpassQL](https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL))
+  * TODO: try to isolate different layers using this API
 
 * Nomainatim API
-    * for reverse geocoding (string -> geoObject)
+  * for reverse geocoding (string -> geoObject)
 
-* [<https://github.com/mocnik-science/osm-python-tools>](OSMPythonTools) for accessing OverpassAPI, NominatimAPI as well as OsmAPI
+* [OSMPythonTools](<https://github.com/mocnik-science/osm-python-tools>) for accessing OverpassAPI, NominatimAPI as well as OsmAPI
   * problems to install under windows (work around: use Anaconda or not Windows)
 
 ## Other resources
