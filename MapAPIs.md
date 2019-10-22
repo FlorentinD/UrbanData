@@ -30,7 +30,7 @@
     * for reverse geocoding (string -> geoObject)
 
 * [<https://github.com/mocnik-science/osm-python-tools>](OSMPythonTools) for accessing OverpassAPI, NominatimAPI as well as OsmAPI
-  * problems to install under windows (use anaconda?)
+  * problems to install under windows (work around: use Anaconda or not Windows)
 
 ## Other resources
 
