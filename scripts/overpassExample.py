@@ -6,7 +6,8 @@ nominatim = Nominatim()
 areaId = nominatim.query('Dresden, Germany').areaId()
 
 overpass = Overpass()
-query = overpassQueryBuilder(area=areaId, elementType='node', selector='"natural"="tree"', out='count')
+query = overpassQueryBuilder(
+    area=areaId, elementType='node', selector='"natural"="tree"', out='count')
 result = overpass.query(query)
 result.countElements()
 
