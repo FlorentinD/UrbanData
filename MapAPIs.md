@@ -37,13 +37,14 @@
 
 ### OpenData Dresden
 
-* [openData Dresden](https://opendata.dresden.de/DreiD/) looks promising
-* [WMS](https://en.wikipedia.org/wiki/Web_Map_Service):
-  * will serve map images
-  * _probably_ not useable if data should be included as a layer in an existing map (!investigate further!)
-* [WFS](https://en.wikipedia.org/wiki/Web_Feature_Service):
+* [openData Dresden](https://opendata.dresden.de/DreiD/)
+* need to manually select important data and corresponding server
+* [Web Map Service](https://en.wikipedia.org/wiki/Web_Map_Service):
+  * will serve map images  
+  * _probably_ not useable if data should be included as a layer in an existing map (!some visualization frameworks allow an _addLayer_ method based on WMS !)
+* [Web Feature Service](https://en.wikipedia.org/wiki/Web_Feature_Service):
   * allows requesting geographical features (_source code_ of the map)
-  &rarr; enables spatial analysis
+  &rarr; enables spatial analysis & feature extraction
 * Fetching data from WMS and WFS Servers:
   * Option 1: request via URL (tedious)
   * Option 2: use [OWSLib](http://geopython.github.io/OWSLib/)
