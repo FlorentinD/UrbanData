@@ -1,16 +1,11 @@
 # Urban Data Seminar
 
-## Current progress
+## Todo
 
-- [x] Find data sources & corresponding APIs
-- [x] Study existing python frameworks for data extraction
-- [x] Get Packages to work (needed conda on windows)  
-- [x] Create small examples for the APIs
-- [x] Get a broad overview of Map-Visualization frameworks in python
-- [ ] Find working python framework for newer WMS versions
-- [ ] What capabilities has OverPassQL ? (possibly easy layer extraction)
-- [ ] Look into data storage formats (f.i. *gml*, *geojson*)
-- [ ] Look into specific Map-Visualization framework
+- [ ] Find working python framework for newer WMS versions (not really a high priotity if WFS service works) (may be supported directly by folium)
+- [ ] How to convert json from overpassQL to geojson (in progress -- done for way-objects)
+- [ ] How to translate gml into geojson?
+- [ ] GeoPandas?
   
 ## Package dependency
 
