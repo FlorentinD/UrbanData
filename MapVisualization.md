@@ -10,8 +10,9 @@
 * [Mapnik](https://mapnik.org/)
 
 ## Slippy Map
-* [folium](https://github.com/python-visualization/folium) 
-  * supports Png, GeoJSON, TopoJSON files as layers 
+
+* [folium](https://github.com/python-visualization/folium)
+  * supports Png, GeoJSON, TopoJSON files as layers
   * or could add a colorline based on a list of points latitude and longitude
   * possible to add markers
 

@@ -12,6 +12,7 @@ def osmWaysToGeoJSON(osmObject):
         raise ValueError("Error converting osm object to geojson: {}".format(error))
     return result 
 
+# TODO: polygon? (building)
 def osmToGeoJsonGeometry(object):
     type = object["type"]
     points = [[pos["lon"],pos["lat"]] for pos in object["geometry"]]

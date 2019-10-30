@@ -25,7 +25,7 @@ def getDresdenHighways():
 
 
 
-
+# TODO: gefactor (if all queries are similar)
 def getDresdenBuildings():
     overpass = Overpass()
     houseQuery = overpassQueryBuilder(
@@ -39,6 +39,8 @@ highways = osmWaysToGeoJSON(highways)
 buildings = getDresdenBuildings().toJSON()["elements"]
 buildings = osmWaysToGeoJSON(buildings)
 
+
+# TODO: Refactor into extra method (main method possibly)
 # TODO: add encoding='UTF-8'
 with open('out/highways.json', 'w', encoding='UTF-8') as outfile:
     #geojson.dump(highways, outfile, ensure_ascii=False)
