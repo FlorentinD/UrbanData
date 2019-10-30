@@ -19,18 +19,32 @@ def getDresdenAreaId():
 def getDresdenHighways():
     overpass = Overpass()
     # out='geom' also leads to geometry key (list of coordinates for each object)
-    houseQuery = overpassQueryBuilder(
+    streetQuery = overpassQueryBuilder(
         area=getDresdenAreaId(), elementType='way', selector=['"highway"'], out='geom')
+    return overpass.query(streetQuery)
+
+
+
+
+def getDresdenBuildings():
+    overpass = Overpass()
+    houseQuery = overpassQueryBuilder(
+        area=getDresdenAreaId(), elementType='way', selector=['"building"'], out='geom')
     return overpass.query(houseQuery)
+
 
 highways = getDresdenHighways().toJSON()["elements"]
 highways = osmWaysToGeoJSON(highways)
 
-
-
-
+buildings = getDresdenBuildings().toJSON()["elements"]
+buildings = osmWaysToGeoJSON(buildings)
 
 # TODO: add encoding='UTF-8'
 with open('out/highways.json', 'w', encoding='UTF-8') as outfile:
     #geojson.dump(highways, outfile, ensure_ascii=False)
     geojson.dump(highways, outfile)
+
+
+with open('out/buildings.json', 'w', encoding='UTF-8') as outfile:
+    #geojson.dump(highways, outfile, ensure_ascii=False)
+    geojson.dump(buildings, outfile)

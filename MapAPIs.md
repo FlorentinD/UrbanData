@@ -43,6 +43,7 @@
   * object selection based on tags
   * restrict area via bouding box or area-id
   * out formats: json, csv, xml
+  * python libary also caches requests
   * TODO: try to isolate more layers using this API (via using tag information)
   * [online tool](https://overpass-turbo.eu/)
 
