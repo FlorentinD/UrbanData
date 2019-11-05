@@ -6,7 +6,10 @@
 
 ## Static Map
 
-* matplotlib
+* geopandas
+  * uses matplotlib 
+  * easy to use
+  * how to add object info?
 * [Mapnik](https://mapnik.org/)
 
 ## Slippy Map

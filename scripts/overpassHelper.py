@@ -6,6 +6,7 @@ import geojson
 
 
 def getAreaId(locationName):
+    # TODO: check if its a place (otherwise following queries won't work)
     nominatim = Nominatim()
     return nominatim.query(locationName).areaId()
 
@@ -24,6 +25,7 @@ def getOsmGeoObjects(areaId, selector):
         area=areaId, elementType='way', selector=selector, out='geom')
     return overpass.query(query).toJSON()["elements"]
 
+
 def saveGeoJson(filename, data):
     filePath = 'out/{}.json'.format(filename)
     with open(filePath, 'w', encoding='UTF-8') as outfile:
@@ -31,8 +33,8 @@ def saveGeoJson(filename, data):
         geojson.dump(data, outfile)
 
 
-# fetch via overpassAPI and saves them as geojson
 def fetchBuildingsAndStreets(areaId, areaName):
+    """ fetch via overpassAPI and saves them as geojson """
     SELECTORS = {"streets": ['"highway"'], "buildings": ['"building"']}
     for name, selector in SELECTORS.items():
         osmObjects = getOsmGeoObjects(areaId, selector)
@@ -41,10 +43,11 @@ def fetchBuildingsAndStreets(areaId, areaName):
         fileName = "{}_{}".format(name, areaName)
         saveGeoJson(fileName, geoJsonObjects)
 
+
 def main():
-    dresdenArea =  getAreaId('Dresden, Germany')
+    dresdenArea = getAreaId('Dresden, Germany')
     fetchBuildingsAndStreets(dresdenArea, "dresden")
+
 
 if __name__ == "__main__":
     main()
-    

@@ -2,16 +2,16 @@
 
 # Getting started
 
-1. Execute the `scripts/overpassHelper.py` for generating the datasets
-2. Explore the datasets using the jupyter notebook `notebooks/foliumNotebook`
+* Install dependencies
+* Look at the notebooks or scripts (f.i. `scripts/foliumPieschenMap`)
 
 ## Todo
 
 - [ ] Find working python framework for newer WMS versions (not really a high priotity if WFS service works) (may be supported directly by folium)
-- [ ] How to convert json from overpassQL to geojson (in progress -- done for way-objects)
+- [x] How to convert json from overpassQL to geojson (works for current queries)
 - [ ] How to translate gml into geojson? (not convertable with ogr?)
-- [ ] GeoPandas?
-- [ ] create layer images (better performance, but not interactive)
+- [x] GeoPandas? (takes very long to load file, probably because multipoint lines get transformed to normal lines)
+- [ ] ?create layer images (better performance, but not interactive (what informations to display?))
   
 ## Package dependency
 
@@ -19,4 +19,4 @@
 - OSMPythonTools (for access to openstreetmap services)
 - Folium (map visualization)
 - geojson (format for importing data into folium map)
-- ?osgeo (converting gml files to geometry)
+- geopandas
