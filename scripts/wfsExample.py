@@ -1,5 +1,5 @@
 from owslib.wfs import WebFeatureService
-
+from osgeo import ogr
 
 def getWfsDescription(service: WebFeatureService) -> str:
     if service:
@@ -20,11 +20,12 @@ wfs = WebFeatureService(
 print(getWfsDescription(wfs))
 
 contentName = next(iter(wfs.contents.keys()))
-boundingbox = wfs.contents[contentName].boundingBox
 
 # returns gml file
-response = wfs.getfeature(typename='cls:L83')
+for content in wfs.contents.keys():
+    response = wfs.getfeature(typename=content)
+    out = open('out/{}_{}.gml'.format(wfs.identification.title, content.replace(':','_')), 'wb')
+    out.write(bytes(response.read(), 'UTF-8'))
+    out.close()
 
-out = open('out/{}.gml'.format(wfs.identification.title), 'wb')
-out.write(bytes(response.read(), 'UTF-8'))
-out.close()
+    #test = ogr.CreateGeometryFromGML(bytes(response.getvalue))

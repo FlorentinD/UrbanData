@@ -9,7 +9,7 @@
 
 - [ ] Find working python framework for newer WMS versions (not really a high priotity if WFS service works) (may be supported directly by folium)
 - [ ] How to convert json from overpassQL to geojson (in progress -- done for way-objects)
-- [ ] How to translate gml into geojson?
+- [ ] How to translate gml into geojson? (not convertable with ogr?)
 - [ ] GeoPandas?
 - [ ] create layer images (better performance, but not interactive)
   
@@ -19,3 +19,4 @@
 - OSMPythonTools (for access to openstreetmap services)
 - Folium (map visualization)
 - geojson (format for importing data into folium map)
+- ?osgeo (converting gml files to geometry)
