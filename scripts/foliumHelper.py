@@ -11,23 +11,30 @@ def cmMapColorToHex(color):
     return matplotlib.colors.rgb2hex(rgb)
 
 
-def styleFunction(colormap, property: str):
-    """style function for folium.geojson"""
+def styleFunction(colorMap, property: str):
+    """style function for folium.geojson based on map (propertyValue -> color)"""
     return lambda feature: {
-        "color": cmMapColorToHex(colormap(hash(feature['properties'][property]) % colormap.N))
+        "color": colorMap[feature['properties'][property]]
     }
 
 
-def generateFeatureCollection(groups, name: str, colormap, propertyForColor: str):
-    """gropus: dictoniary with geojson.FeatureCollections as values"""
-    # colormap = matplotlib.col.get_cmap("GnBu", lut=len(groups)))
+def generateFeatureCollection(groups, name: str, colormapName, propertyForColor: str):
+    """groups: dictoniary with geojson.FeatureCollections as values"""
+
+    colormap = matplotlib.cm.get_cmap(name=colormapName, lut=len(groups))
+    # similar often groups, should get different colours
+    #groupSizes = [(key, len(gr["features"])) for key, gr in groups.items()]
+    #groupSizes.sort(key=lambda tup: tup[1])
+    groupColorMap = {key: cmMapColorToHex(colormap(i)) for i, (key, _)  in enumerate(groups.items())}
+
+    # TODO: encode in name also the sublayers + colors (via HTML)
     featureCollection = folium.FeatureGroup(name=name)
     for type, group in groups.items():
         properties = list(group["features"][0]["properties"].keys())
         layer = folium.GeoJson(
             group,
             name=type,
-            style_function=styleFunction(colormap, propertyForColor),
+            style_function=styleFunction(groupColorMap, propertyForColor),
             tooltip=folium.features.GeoJsonTooltip(
                 fields=properties),
             show=True,

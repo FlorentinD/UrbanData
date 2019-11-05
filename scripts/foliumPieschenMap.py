@@ -17,32 +17,37 @@ map = folium.Map(
 
 file = open("out/streets_pieschen.json", encoding='UTF-8')
 all_streets = json.load(file)
-street_types = groupBy(all_streets, ["highway"])
+streetGroups = groupBy(all_streets, ["highway"])
 
-colormap = cm.get_cmap(name="BrBG", lut=len(street_types))
+streetsMap = generateFeatureCollection(
+    streetGroups, "Streets", "BrBG", "highway")
 
-for type, streets in street_types.items():
+streetsMap.add_to(map)
+
+# colormap = cm.get_cmap(name="BrBG", lut=len(streetGroups))
+# streetColors = {key: colormap(i) for i, key in enumerate(streetGroups.keys())}
+
+""" for type, streets in streetGroups.items():
     properties = list(streets["features"][0]["properties"].keys())
     layer = folium.GeoJson(
         streets,
         name=type,
         style_function=lambda feature: {
-            "color": cmMapColorToHex(colormap(hash(feature['properties']['highway']) % colormap.N))
+            "color": cmMapColorToHex(streetColors[feature['properties']['highway']])
         },
         tooltip=folium.features.GeoJsonTooltip(
             fields=properties),
         show=True,
     )
-    layer.add_to(map)
+    layer.add_to(map) """
 
 
-buildings_colormap = cm.get_cmap(name="RdBu", lut=len(street_types))
 file = open("out/buildings_pieschen.json", encoding='UTF-8')
 all_buildings = json.load(file)
 buildingGroups = groupBy(all_buildings, ["building"])
 
 buildingsMap = generateFeatureCollection(
-    buildingGroups, "Buildings", buildings_colormap, "building")
+    buildingGroups, "Buildings", "coolwarm", "building")
 
 buildingsMap.add_to(map)
 folium.LayerControl().add_to(map)
