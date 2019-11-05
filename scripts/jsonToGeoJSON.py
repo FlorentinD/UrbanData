@@ -1,6 +1,6 @@
 import geojson
 
-# given a list osm-objects as json (! in geom format!)
+# given a list osm-objects as json (! in geom out-format!)
 def osmWaysToGeoJSON(osmObject):
     features = []
     for object in osmObject:
