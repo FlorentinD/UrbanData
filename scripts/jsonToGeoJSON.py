@@ -49,3 +49,16 @@ def groupBy(featureCollection, properties):
         else:
             groups[groupByValue].append(row)
     return {key: geojson.FeatureCollection(group) for key, group in groups.items()}
+
+# TODO do in group
+def getSchema(featureCollection):
+    properties = {}
+    for feature in featureCollection["features"]:
+        for property in feature["properties"].keys():
+            if property in properties:
+                properties[property] += 1
+            else:
+                properties[property] = 0
+    properties = list(properties.items())
+    properties.sort(key=lambda tup: tup[1], reverse=True)
+    return [name for name, count in properties[:3]]

@@ -1,7 +1,7 @@
 import json
 import folium
 import matplotlib
-from jsonToGeoJSON import groupBy
+from jsonToGeoJSON import groupBy, getSchema
 from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
 
@@ -32,10 +32,11 @@ def generateFeatureCollection(groups, name: str, colormapName, propertyForColor:
     #groupSizes.sort(key=lambda tup: tup[1])
     groupColorMap = {key: cmMapColorToHex(colormap(i)) for i, (key, _)  in enumerate(groups.items())}
 
-    # TODO: encode in name also the sublayers + colors (via HTML)
+    # TODO: get top10 properties to work
     featureCollection = folium.FeatureGroup(name=name + collapseSubLayers(groupColorMap))
     for type, group in groups.items():
         properties = list(group["features"][0]["properties"].keys())
+        #properties = getSchema(group)
         layer = folium.GeoJson(
             group,
             name=type,

@@ -1,6 +1,7 @@
 # from https://github.com/mocnik-science/osm-python-tools (adapted example 3)
 from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
+from pathlib import Path
 from jsonToGeoJSON import osmWaysToGeoJSON
 import geojson
 
@@ -33,15 +34,20 @@ def saveGeoJson(filename, data):
         geojson.dump(data, outfile)
 
 
-def fetchBuildingsAndStreets(areaId, areaName):
+def fetchBuildingsAndStreets(areaId, areaName, overrideFiles=True):
     """ fetch via overpassAPI and saves them as geojson """
     SELECTORS = {"streets": ['"highway"'], "buildings": ['"building"']}
     for name, selector in SELECTORS.items():
-        osmObjects = getOsmGeoObjects(areaId, selector)
-        print("Loaded {} {} for {}".format(len(osmObjects), name, areaName))
-        geoJsonObjects = osmWaysToGeoJSON(osmObjects)
         fileName = "{}_{}".format(name, areaName)
-        saveGeoJson(fileName, geoJsonObjects)
+        # TODO: refactor into constant 
+        filePath = 'out/{}.json'.format(fileName)
+        if Path(filePath).is_file() and not overrideFiles:
+            print("creation skipped, {} exists already".format(fileName))
+        else: 
+            osmObjects = getOsmGeoObjects(areaId, selector)
+            print("Loaded {} {} for {}".format(len(osmObjects), name, areaName))
+            geoJsonObjects = osmWaysToGeoJSON(osmObjects)
+            saveGeoJson(fileName, geoJsonObjects)
 
 
 def main():

@@ -9,7 +9,7 @@ from overpassHelper import fetchBuildingsAndStreets
 
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')
 pieschenCoord = pieschen.toJSON()[0]
-fetchBuildingsAndStreets(pieschen.areaId(), "pieschen")
+fetchBuildingsAndStreets(pieschen.areaId(), "pieschen", overrideFiles=False)
 
 map = folium.Map(
     location=[pieschenCoord["lat"], pieschenCoord["lon"]], tiles='Stamen Toner', zoom_start=15)
@@ -52,4 +52,6 @@ buildingsMap = generateFeatureCollection(
 buildingsMap.add_to(map)
 folium.LayerControl().add_to(map)
 
-map.save("out/map_pieschen.html")
+fileName = "out/map_pieschen.html"
+print("Map saved in {}".format(fileName))
+map.save(fileName)
