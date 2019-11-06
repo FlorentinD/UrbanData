@@ -17,6 +17,11 @@ def styleFunction(colorMap, property: str):
         "color": colorMap[feature['properties'][property]]
     }
 
+def collapseSubLayers(groupColorMap):
+    """ generaters HTML to show in layer control """
+    itemString = "<span style='color:{}'> <br> &nbsp; {} </span>"
+    layerDescription = [itemString.format(color, name) for name, color in groupColorMap.items()]
+    return '\n'.join(layerDescription)
 
 def generateFeatureCollection(groups, name: str, colormapName, propertyForColor: str):
     """groups: dictoniary with geojson.FeatureCollections as values"""
@@ -28,7 +33,7 @@ def generateFeatureCollection(groups, name: str, colormapName, propertyForColor:
     groupColorMap = {key: cmMapColorToHex(colormap(i)) for i, (key, _)  in enumerate(groups.items())}
 
     # TODO: encode in name also the sublayers + colors (via HTML)
-    featureCollection = folium.FeatureGroup(name=name)
+    featureCollection = folium.FeatureGroup(name=name + collapseSubLayers(groupColorMap))
     for type, group in groups.items():
         properties = list(group["features"][0]["properties"].keys())
         layer = folium.GeoJson(
@@ -37,7 +42,8 @@ def generateFeatureCollection(groups, name: str, colormapName, propertyForColor:
             style_function=styleFunction(groupColorMap, propertyForColor),
             tooltip=folium.features.GeoJsonTooltip(
                 fields=properties),
-            show=True,
+            show=True
         )
         layer.add_to(featureCollection)
+
     return featureCollection
