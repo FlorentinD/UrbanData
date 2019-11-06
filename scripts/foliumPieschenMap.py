@@ -5,10 +5,10 @@ from jsonToGeoJSON import groupBy
 from foliumHelper import generateFeatureCollection, styleFunction, cmMapColorToHex
 from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
-from overpassHelper import fetchBuildingsAndStreets
+from overpassHelper import OverPassHelper
 
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')
-fetchBuildingsAndStreets(pieschen.areaId(), "pieschen", overrideFiles=False)
+OverPassHelper().fetch(pieschen.areaId(), "pieschen", overrideFiles=True)
 
 pieschenCoord = pieschen.toJSON()[0]
 map = folium.Map(
@@ -35,8 +35,18 @@ buildingsMap = generateFeatureCollection(
     buildingGroups, "Buildings", "coolwarm", "building")
 
 buildingsMap.add_to(map)
+
+
+file = open("out/landuse_pieschen.json", encoding='UTF-8')
+all_landuse = json.load(file)
+landUseGroups = groupBy(all_landuse, ["landuse"])
+
+landUseMap = generateFeatureCollection(
+    landUseGroups, "LandUse", "hsv", "landuse")
+
+landUseMap.add_to(map)
 folium.LayerControl().add_to(map)
 
 fileName = "out/map_pieschen.html"
-print("Map saved in {}".format(fileName))
 map.save(fileName)
+print("Map saved in {}".format(fileName))

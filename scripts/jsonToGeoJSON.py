@@ -17,7 +17,7 @@ def osmWaysToGeoJSON(osmObject):
 
 
 def osmToGeoJsonGeometry(object):
-    # TODO: polygon? (building)
+    # TODO: polygon for f.i. landuse
     type = object["type"]
     points = [[pos["lon"], pos["lat"]] for pos in object["geometry"]]
     if points is None:

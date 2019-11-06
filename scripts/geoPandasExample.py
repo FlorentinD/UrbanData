@@ -1,12 +1,12 @@
 import geopandas
 import matplotlib.pyplot as plt
 from OSMPythonTools.nominatim import Nominatim
-from overpassHelper import fetchBuildingsAndStreets
+from overpassHelper import OverPassHelper
 
 plt.rcParams["figure.figsize"] = (25,25)
 
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')
-fetchBuildingsAndStreets(pieschen.areaId(), "pieschen")
+OverPassHelper().fetch(pieschen.areaId(), "pieschen")
 
 
 highWayFrame = geopandas.read_file("out/streets_pieschen.json", driver='GeoJson')

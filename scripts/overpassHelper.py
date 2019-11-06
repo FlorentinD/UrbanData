@@ -5,55 +5,48 @@ from pathlib import Path
 from jsonToGeoJSON import osmWaysToGeoJSON
 import geojson
 
+class OverPassHelper:
+    fileName = "{objectType}_{area}.json"
+    filePath = None
+    selectors = {"streets": ['"highway"'], "buildings": ['"building"'], "landuse": ['"landuse"']}
 
-def getAreaId(locationName):
-    # TODO: check if its a place (otherwise following queries won't work)
-    nominatim = Nominatim()
-    return nominatim.query(locationName).areaId()
+    def __init__(self, outPath='out/'):
+        # TODO: Validate path is directory
+        self.filePath = outPath + self.fileName
 
+    def getAreaId(self, locationName):
+        # TODO: check if its a place (otherwise following queries won't work)
+        nominatim = Nominatim()
+        return nominatim.query(locationName).areaId()
 
-#overpass = Overpass()
-# treeQuery = overpassQueryBuilder(
-#    area=getDresdenAreaId(), elementType='node', selector='"natural"="tree"', out='count')
-#result = overpass.query(treeQuery)
-#print("There are {} trees in Dresden".format(result.countElements()))
-
-
-def getOsmGeoObjects(areaId, selector):
-    overpass = Overpass()
-    # out='geom' also leads to geometry key (list of coordinates for each object)
-    query = overpassQueryBuilder(
-        area=areaId, elementType='way', selector=selector, out='geom')
-    return overpass.query(query).toJSON()["elements"]
-
-
-def saveGeoJson(filename, data):
-    filePath = 'out/{}.json'.format(filename)
-    with open(filePath, 'w', encoding='UTF-8') as outfile:
-        #geojson.dump(data, outfile, ensure_ascii=False)
-        geojson.dump(data, outfile)
+    def getOsmGeoObjects(self, areaId, selector):
+        overpass = Overpass()
+        # out='geom' also leads to geometry key (list of coordinates for each object)
+        query = overpassQueryBuilder(
+            area=areaId, elementType='way', selector=selector, out='geom')
+        return overpass.query(query).toJSON()["elements"]
 
 
-def fetchBuildingsAndStreets(areaId, areaName, overrideFiles=True):
-    """ fetch via overpassAPI and saves them as geojson """
-    SELECTORS = {"streets": ['"highway"'], "buildings": ['"building"']}
-    for name, selector in SELECTORS.items():
-        fileName = "{}_{}".format(name, areaName)
-        # TODO: refactor into constant 
-        filePath = 'out/{}.json'.format(fileName)
-        if Path(filePath).is_file() and not overrideFiles:
-            print("creation skipped, {} exists already".format(fileName))
-        else: 
-            osmObjects = getOsmGeoObjects(areaId, selector)
-            print("Loaded {} {} for {}".format(len(osmObjects), name, areaName))
-            geoJsonObjects = osmWaysToGeoJSON(osmObjects)
-            saveGeoJson(fileName, geoJsonObjects)
+    def saveGeoJson(self, file, data):
+        with open(file, 'w', encoding='UTF-8') as outfile:
+            #geojson.dump(data, outfile, ensure_ascii=False)
+            geojson.dump(data, outfile)
 
 
-def main():
-    dresdenArea = getAreaId('Dresden, Germany')
-    fetchBuildingsAndStreets(dresdenArea, "dresden")
+    def fetch(self, areaId, areaName, overrideFiles=True):
+        """ fetch area data via overpassAPI and saves them as geojson """
+        for name, selector in self.selectors.items():
+            file = self.filePath.format(objectType = name, area = areaName)
+            if Path(file).is_file() and not overrideFiles:
+                print("creation skipped, {} exists already".format(file))
+            else:
+                osmObjects = self.getOsmGeoObjects(areaId, selector)
+                print("Loaded {} {} for {}".format(
+                    len(osmObjects), name, areaName))
+                geoJsonObjects = osmWaysToGeoJSON(osmObjects)
+                self.saveGeoJson(file, geoJsonObjects)
 
 
-if __name__ == "__main__":
-    main()
+    def main(self):
+        dresdenArea = self.getAreaId('Dresden, Germany')
+        self.fetch(dresdenArea, "dresden")
