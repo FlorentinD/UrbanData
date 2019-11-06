@@ -3,7 +3,7 @@
 # Getting started
 
 * Install dependencies
-* Look at the notebooks or scripts (f.i. `scripts/foliumPieschenMap`)
+* Look at the notebooks or scripts (f.i. `scripts/complexFoliumMap`)
 
 ## Todo
 

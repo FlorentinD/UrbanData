@@ -17,11 +17,14 @@ def styleFunction(colorMap, property: str):
         "color": colorMap[feature['properties'][property]]
     }
 
+
 def collapseSubLayers(groupColorMap):
     """ generaters HTML to show in layer control """
     itemString = "<span style='color:{}'> <br> &nbsp; {} </span>"
-    layerDescription = [itemString.format(color, name) for name, color in groupColorMap.items()]
+    layerDescription = [itemString.format(
+        color, name) for name, color in groupColorMap.items()]
     return '\n'.join(layerDescription)
+
 
 def generateFeatureCollection(groups, name: str, colormapName, propertyForColor: str):
     """groups: dictoniary with geojson.FeatureCollections as values"""
@@ -30,10 +33,12 @@ def generateFeatureCollection(groups, name: str, colormapName, propertyForColor:
     # similar often groups, should get different colours
     #groupSizes = [(key, len(gr["features"])) for key, gr in groups.items()]
     #groupSizes.sort(key=lambda tup: tup[1])
-    groupColorMap = {key: cmMapColorToHex(colormap(i)) for i, (key, _)  in enumerate(groups.items())}
+    groupColorMap = {key: cmMapColorToHex(
+        colormap(i)) for i, (key, _) in enumerate(groups.items())}
 
     # TODO: get real properties to work
-    featureCollection = folium.FeatureGroup(name=name + collapseSubLayers(groupColorMap))
+    featureCollection = folium.FeatureGroup(
+        name=name + collapseSubLayers(groupColorMap))
     for type, group in groups.items():
         properties = list(group["features"][0]["properties"].keys())
         #properties = getSchema(group, amount=5)
