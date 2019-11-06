@@ -51,7 +51,7 @@ def groupBy(featureCollection, properties):
     return {key: geojson.FeatureCollection(group) for key, group in groups.items()}
 
 # TODO do in group
-def getSchema(featureCollection):
+def getSchema(featureCollection, amount:int=10):
     properties = {}
     for feature in featureCollection["features"]:
         for property in feature["properties"].keys():
@@ -61,4 +61,7 @@ def getSchema(featureCollection):
                 properties[property] = 0
     properties = list(properties.items())
     properties.sort(key=lambda tup: tup[1], reverse=True)
-    return [name for name, count in properties[:3]]
+
+    if amount > len(properties):
+        amount = len(properties)
+    return [name for name, count in properties[:amount]]

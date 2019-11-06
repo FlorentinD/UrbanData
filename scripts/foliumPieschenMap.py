@@ -8,9 +8,9 @@ from folium.plugins.measure_control import MeasureControl
 from overpassHelper import fetchBuildingsAndStreets
 
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')
-pieschenCoord = pieschen.toJSON()[0]
 fetchBuildingsAndStreets(pieschen.areaId(), "pieschen", overrideFiles=False)
 
+pieschenCoord = pieschen.toJSON()[0]
 map = folium.Map(
     location=[pieschenCoord["lat"], pieschenCoord["lon"]], tiles='Stamen Toner', zoom_start=15)
 
@@ -26,21 +26,6 @@ streetsMap.add_to(map)
 
 # colormap = cm.get_cmap(name="BrBG", lut=len(streetGroups))
 # streetColors = {key: colormap(i) for i, key in enumerate(streetGroups.keys())}
-
-""" for type, streets in streetGroups.items():
-    properties = list(streets["features"][0]["properties"].keys())
-    layer = folium.GeoJson(
-        streets,
-        name=type,
-        style_function=lambda feature: {
-            "color": cmMapColorToHex(streetColors[feature['properties']['highway']])
-        },
-        tooltip=folium.features.GeoJsonTooltip(
-            fields=properties),
-        show=True,
-    )
-    layer.add_to(map) """
-
 
 file = open("out/buildings_pieschen.json", encoding='UTF-8')
 all_buildings = json.load(file)

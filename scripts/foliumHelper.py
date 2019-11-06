@@ -32,11 +32,11 @@ def generateFeatureCollection(groups, name: str, colormapName, propertyForColor:
     #groupSizes.sort(key=lambda tup: tup[1])
     groupColorMap = {key: cmMapColorToHex(colormap(i)) for i, (key, _)  in enumerate(groups.items())}
 
-    # TODO: get top10 properties to work
+    # TODO: get real properties to work
     featureCollection = folium.FeatureGroup(name=name + collapseSubLayers(groupColorMap))
     for type, group in groups.items():
         properties = list(group["features"][0]["properties"].keys())
-        #properties = getSchema(group)
+        #properties = getSchema(group, amount=5)
         layer = folium.GeoJson(
             group,
             name=type,
