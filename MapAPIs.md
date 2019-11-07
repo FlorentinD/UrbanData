@@ -67,4 +67,7 @@
   &rarr; enables spatial analysis & feature extraction
 * Fetching data from WMS and WFS Servers:
   * Option 1: request via URL (tedious)
-  * Option 2: use [OWSLib](http://geopython.github.io/OWSLib/) --> get gml file (no libary for converting to geojson?)
+  * Option 2: use [OWSLib](http://geopython.github.io/OWSLib/) --> get gml file 
+   * python gml to geojson conversion seems fault ? via ogr2ogr
+   * ! but https://mygeodata.cloud/conversion seems to work fine (for samples, as not completly free service)
+   
