@@ -39,7 +39,7 @@ def groupBy(featureCollection, properties):
     features = featureCollection["features"]
     groups = {}
     if isinstance(properties, str):
-        columns = [columns]
+        properties = [properties]
     for row in features:
         groupByValue = []
         [groupByValue.append(row["properties"][prop]) for prop in properties]
