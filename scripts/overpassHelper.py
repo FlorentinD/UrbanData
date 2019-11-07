@@ -4,13 +4,14 @@ from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
 from pathlib import Path
 from jsonToGeoJSON import osmWaysToGeoJSON
 import geojson
+from typing import Dict
 
 class OverPassHelper:
     fileName = "{objectType}_{area}.json"
     filePath = None
     selectors = {"streets": ['"highway"'], "buildings": ['"building"'], "landuse": ['"landuse"']}
 
-    def __init__(self, outPath='out/'):
+    def __init__(self, outPath='out/data/'):
         # TODO: Validate path is directory
         self.filePath = outPath + self.fileName
 
@@ -33,10 +34,13 @@ class OverPassHelper:
             geojson.dump(data, outfile)
 
 
-    def fetch(self, areaId, areaName, overrideFiles=True):
-        """ fetch area data via overpassAPI and saves them as geojson """
+    def fetch(self, areaId, areaName, overrideFiles=True) -> Dict[str, str]:
+        """ fetch area data via overpassAPI and saves them as geojson 
+            return a dict: objectType -> file"""
+        objectFiles = {}
         for name, selector in self.selectors.items():
             file = self.filePath.format(objectType = name, area = areaName)
+            objectFiles[name] = file
             if Path(file).is_file() and not overrideFiles:
                 print("creation skipped, {} exists already".format(file))
             else:
@@ -45,6 +49,8 @@ class OverPassHelper:
                     len(osmObjects), name, areaName))
                 geoJsonObjects = osmWaysToGeoJSON(osmObjects)
                 self.saveGeoJson(file, geoJsonObjects)
+        return objectFiles
+            
 
 
     def main(self):

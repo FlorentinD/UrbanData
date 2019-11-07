@@ -24,8 +24,9 @@ contentName = next(iter(wfs.contents.keys()))
 # returns gml file
 for content in wfs.contents.keys():
     response = wfs.getfeature(typename=content)
-    out = open('out/{}_{}.gml'.format(wfs.identification.title, content.replace(':','_')), 'wb')
+    out = open('out/data/{}_{}.gml'.format(wfs.identification.title, content.replace(':','_')), 'wb')
     out.write(bytes(response.read(), 'UTF-8'))
     out.close()
 
     #test = ogr.CreateGeometryFromGML(bytes(response.getvalue))
+    # TODO: find working converter for gml to geojson
