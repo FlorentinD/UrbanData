@@ -1,0 +1,62 @@
+Nutzer, Verhalten, Schritt, Verb, Substantiv
+Student, Besuch einer Lehrveranstaltung, 1, laufen, Haltestelle
+Student, Besuch einer Lehrveranstaltung, 2, einsteigen, Bus
+Student, Besuch einer Lehrveranstaltung, 3, aussteigen, Bus
+Student, Besuch einer Lehrveranstaltung, 4, laufen, Lehrgebaeude
+Student, Besuch einer Lehrveranstaltung, 5, essen, Mensa
+Student, Besuch einer Lehrveranstaltung, 6, laufen, Haltestelle
+Student, Besuch einer Lehrveranstaltung, 7, einsteigen, Bus
+Student, Besuch einer Lehrveranstaltung, 8, aussteigen, Bus
+Student, Besuch einer Lehrveranstaltung, 9, einkaufen, Supermarkt
+Student, Besuch einer Lehrveranstaltung, 10, laufen, Nachhause
+Student, Am Elbufer mit Freunden treffen, 1, laufen, Haltestelle
+Student, Am Elbufer mit Freunden treffen, 2, einsteigen, Bahn
+Student, Am Elbufer mit Freunden treffen, 3, aussteigen, Bahn
+Student, Am Elbufer mit Freunden treffen, 4, umsteigen, Bahn
+Student, Am Elbufer mit Freunden treffen, 5, warten, Freunde
+Student, Am Elbufer mit Freunden treffen, 5, treffen, Freunde
+Student, Am Elbufer mit Freunden treffen, 6, einkaufen, Spaeti
+Student, Am Elbufer mit Freunden treffen, 7, laufen, Elbufer
+Student, Am Elbufer mit Freunden treffen, 8, suchen, Sitzplatz
+Student, Am Elbufer mit Freunden treffen, 9, unterhalten, Freunde
+Student, Am Elbufer mit Freunden treffen, 10, laufen, Haltestelle
+Student, Am Elbufer mit Freunden treffen, 11, einsteigen, Bahn
+Student, Am Elbufer mit Freunden treffen, 12, umsteigen, Bahn
+Student, Am Elbufer mit Freunden treffen, 13, aussteigen, Bahn
+Student, Am Elbufer mit Freunden treffen, 14, laufen, Nachhause
+Rentner, Arztbesuche, 1, laufen, Haltestelle
+Rentner, Arztbesuche, 2, hinsetzen, Bank
+Rentner, Arztbesuche, 3, einsteigen, Bus
+Rentner, Arztbesuche, 4, hinsetzen, Sitzplatz
+Rentner, Arztbesuche, 5, aussteigen, Bus
+Rentner, Arztbesuche, 6, laufen, Arztpraxis
+Rentner, Arztbesuche, 7, besuchen, Arzt
+Rentner, Arztbesuche, 8, laufen, Haltestelle
+Rentner, Arztbesuche, 9, setzen, Bank
+Rentner, Arztbesuche, 10, einsteigen, Bus
+Rentner, Arztbesuche, 11, hinsetzen, Sitzplatz
+Rentner, Arztbesuche, 12, aussteigen, Bus
+Rentner, Arztbesuche, 13, laufen, Nachhause
+Rentner, Sparziergang im Park, 1, laufen, Strasse
+Rentner, Sparziergang im Park, 2, laufen, Park
+Rentner, Sparziergang im Park, 3, hinsetzen, Bank
+Rentner, Sparziergang im Park, 4, beobachten, Leute
+Rentner, Sparziergang im Park, 5, laufen, Park
+Rentner, Sparziergang im Park, 6, hinsetzen, Bank
+Rentner, Sparziergang im Park, 7, laufen, Nachhause
+Kind, Grosseltern besuchen, 1, packen, Sachen
+Kind, Grosseltern besuchen, 2, einsteigen, Auto
+Kind, Grosseltern besuchen, 3, hoeren, Musik
+Kind, Grosseltern besuchen, 4, aussteigen, Auto
+Kind, Grosseltern besuchen, 5, besuchen, Grosseltern
+Kind, Grosseltern besuchen, 6, verabschieden, Grosseltern
+Kind, Grosseltern besuchen, 7, einsteigen, Auto
+Kind, Grosseltern besuchen, 8, aussteigen, Auto
+Kind, Grosseltern besuchen, 9, auspacken, Sachen
+Kind, Auf einem Spielplatz spielen, 1, fragen, Eltern
+Kind, Auf einem Spielplatz spielen, 2, fragen, Freunde
+Kind, Auf einem Spielplatz spielen, 3, laufen, Spielplatz
+Kind, Auf einem Spielplatz spielen, 4, treffen, Freunde
+Kind, Auf einem Spielplatz spielen, 5, spielen, Spielplatz
+Kind, Auf einem Spielplatz spielen, 6, laufen, Nachhause
+
