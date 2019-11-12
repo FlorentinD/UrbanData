@@ -24,14 +24,13 @@ colormaps = ["hsv", "BrBG", "coolwarm"]
 
 objectTypeTagMapping = {"streets": "highway", "buildings": "building", "landuse": "landuse"}
 
-for i, (objectType, featureFile) in enumerate(osmDataFiles.items()):
-    file = open(featureFile, encoding='UTF-8')
+for i, osmQuery in enumerate(osmDataFiles):
+    file = open(osmQuery.filePath, encoding='UTF-8')
     allObjects = json.load(file)
-    osmTag = objectTypeTagMapping[objectType]
-    objectGroups = groupBy(allObjects, osmTag)
+    objectGroups = groupBy(allObjects, osmQuery.groupByProperty)
 
     objectMap = generateFeatureCollection(
-    objectGroups, objectType, colormaps[i % len(colormaps)], osmTag)
+    objectGroups, osmQuery.name, colormaps[i % len(colormaps)], osmQuery.groupByProperty)
     objectMap.add_to(map)
 
 folium.LayerControl().add_to(map)
