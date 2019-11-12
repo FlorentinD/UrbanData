@@ -1,7 +1,7 @@
 import geojson
 
 
-def osmWaysToGeoJSON(osmObject):
+def osmObjectsToGeoJSON(osmObject):
     """given a list osm-objects as json (! in geom out-format!)"""
     features = []
     for object in osmObject:
@@ -17,18 +17,20 @@ def osmWaysToGeoJSON(osmObject):
 
 
 def osmToGeoJsonGeometry(object):
-    # TODO: polygon for f.i. landuse
-    type = object["type"]
-    points = [[pos["lon"], pos["lat"]] for pos in object["geometry"]]
+    if "geometry" in object:
+        points = [[pos["lon"], pos["lat"]] for pos in object["geometry"]]
+    elif "lon" in object and "lat" in object:
+        points = [[object["lon"], object["lat"]]]
+    else:
+        raise ValueError("{} contains no geometry or lon/lat data".format(object))
     if points is None:
         raise ValueError('osm object has no geometry key {}'.format(object))
-    if type == "way":
+    if len(points) > 1:
+          # TODO: polygon for f.i. landuse
         return geojson.LineString(points, validate=True)
-    elif type == "node":
+    else:
         assert(len(points) == 1)
         return geojson.Point(points[0], validate=True)
-    else:
-        raise ValueError('osm object {} not supported yet'.format(type))
 
 
 # geoJsonGroupBy TODO: also retrieve schema info?
@@ -50,7 +52,7 @@ def groupBy(featureCollection, properties):
             groups[groupByValue].append(row)
     return {key: geojson.FeatureCollection(group) for key, group in groups.items()}
 
-# TODO do in group
+
 def getSchema(featureCollection, amount:int=10):
     properties = {}
     for feature in featureCollection["features"]:

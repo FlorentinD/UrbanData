@@ -6,7 +6,6 @@
 * commercial 
 * residential
 * handel
-(necessary with open data dresden ?)
 
 ## leisure
 
@@ -19,12 +18,13 @@
 ## streets
 
 * collect streets as borders
-* alles wo autos lang fahren koennen
+* where cars can drive
+* railway ?
 
 ## safety
 
-* police
-* fire department
+* police (included in landuse = civic_admin)
+* fire department (in amenity)
 
 ## health
 
@@ -33,13 +33,13 @@
 
 ## public admin
 
-    aemter und co
+* government tag
+* office ?
 
 ## companies
 
 * possible via scraping chamber of commerce, yellow pages or similar for addresses
 
-
 ### area
 
-pieschen mit option auf ganz dresden
+* pieschen and optionaly expand to whole Dresden

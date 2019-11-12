@@ -4,16 +4,6 @@ from jsonToGeoJSON import groupBy
 from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
 
-# TODO: highway --> color
-def style_function(feature):
-    streetType = int(bytes(feature['properties']["highway"]))
-    return {
-        'fillOpacity': 0.5,
-        'weight': 0,
-        'fillColor': '#black'
-    }
-
-
 pieschen = Nominatim().query('Dresden Pieschen, Germany').toJSON()[0]
 
 file = open("out/streets_dresden.json", encoding='UTF-8')

@@ -18,11 +18,11 @@ def styleFunction(colorMap, property: str):
     }
 
 
-def collapseSubLayers(groupColorMap):
+def collapseSubLayers(groupColorMap, groupsCount):
     """ generaters HTML to show in layer control """
-    itemString = "<span style='color:{}'> <br> &nbsp; {} </span>"
+    itemString = "<span style='color:{}'> <br> &nbsp; {} ({}) </span>"
     layerDescription = [itemString.format(
-        color, name) for name, color in groupColorMap.items()]
+        color, name, groupsCount[name]) for name, color in groupColorMap.items()]
     return '\n'.join(layerDescription)
 
 
@@ -35,12 +35,14 @@ def generateFeatureCollection(groups, name: str, colormapName, propertyForColor:
     #groupSizes.sort(key=lambda tup: tup[1])
     groupColorMap = {key: cmMapColorToHex(
         colormap(i)) for i, (key, _) in enumerate(groups.items())}
-
-    # TODO: get real properties to work
+    groupsCount = {name: len(group["features"]) for name, group in groups.items()}
     featureCollection = folium.FeatureGroup(
-        name=name + collapseSubLayers(groupColorMap))
+        name=name + collapseSubLayers(groupColorMap, groupsCount))
     for type, group in groups.items():
+        # workaround as getSchema does not work
         properties = list(group["features"][0]["properties"].keys())
+        #if "yes" == type:
+        #   print(getSchema(group))
         #properties = getSchema(group, amount=5)
         layer = folium.GeoJson(
             group,

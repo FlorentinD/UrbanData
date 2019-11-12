@@ -7,11 +7,13 @@ from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
 from overpassHelper import OverPassHelper
 
+# TODO: adapt to new API 
+
 # postfix for f.i. file_names
 areaName = "pieschen" 
 # area to query
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')
-osmDataFiles = OverPassHelper().fetch(pieschen.areaId(), areaName, overrideFiles=True)
+osmDataFiles = OverPassHelper().fetch(pieschen.areaId(), areaName, overrideFiles=False)
 
 pieschenCoord = pieschen.toJSON()[0]
 map = folium.Map(
