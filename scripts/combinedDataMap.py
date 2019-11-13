@@ -9,8 +9,9 @@ from OsmObjectType import OsmObjectType as OsmObject
 from overpassHelper import OverPassHelper
 from OsmDataQuery import OsmDataQuery
 
-# TODO: define fields for every layer?
-# TODO: combine apartments beside each other to complex
+# TODO: groupby on either amenity or building? (overlapping) (layers based on multiple tags not on single tag)
+# TODO: layers Safety, Health, Leisure, Commercial (shops, craft, building manaufture, ...), Religion,
+# TODO: plot points as circle_markers as geojsontooltip PRs regarding this are not finished (see foliumhelper)
 
 # postfix for f.i. file_names
 areaName = "pieschen"
@@ -25,31 +26,36 @@ landuseSelector = ['landuse~"industrial|civic_admin|commercial|retail"',
                    "amenity!~'.'", "leisure!~'.'"]
 leisureSelector = ['leisure']
 railwaySelector = ['railway~"tram|rail"']
-# TODO: probably split into different layers 
-amenitySelector = ['amenity~"restaurant|cinema|pharmacy|post_office|pub|fast_food|biergarten|cafe|dentist|police|place_of_worship|ice_cream|doctors|theatre|library|gambling|music_school|social_facility|marketplace|fire_station|townhall|nightclub|community_centre|social_club"', 'leisure!~"."']  
+# TODO: probably split into different layers
+amenitySelector = ['amenity~"restaurant|cinema|pharmacy|post_office|pub|fast_food|biergarten|cafe|dentist|police|place_of_worship|ice_cream|doctors|theatre|library|gambling|music_school|social_facility|marketplace|fire_station|townhall|nightclub|community_centre|social_club"', 'leisure!~"."']
 shopSelector = ['shop', 'leisure!~"."',
-                'building!~"."', 'amenity!~"."']  
+                'building!~"."', 'amenity!~"."']
 craftSelector = ['craft', 'leisure!~"."', 'shop!~"."',
-                 'building!~"."', 'amenity!~"."']  
+                 'building!~"."', 'amenity!~"."']
 
 
 # add openDataDresden mapping (obsolete)
-objectTypeTagMapping = {
-    "landnutzung1": "kuek_kl", "landnutzung2": "textstring"}
+# objectTypeTagMapping = {
+#     "landnutzung1": "kuek_kl", "landnutzung2": "textstring"}
 
-openDataDresdenDir = "out/data/openDataDresden/"
-openDataDresdenFiles = {"landnutzung1": "{}nutzungsarten_1.geojson".format(
-    openDataDresdenDir), "landnutzung2": "{}nutzungsarten_2.geojson".format(openDataDresdenDir)}
+# openDataDresdenDir = "out/data/openDataDresden/"
+# openDataDresdenFiles = {"landnutzung1": "{}nutzungsarten_1.geojson".format(
+#     openDataDresdenDir), "landnutzung2": "{}nutzungsarten_2.geojson".format(openDataDresdenDir)}
 
 osmQueries = [OsmDataQuery("streets", OsmObject.WAY, streetsSelector, "highway"),
-              OsmDataQuery("buildings", OsmObject.WAY, buildingsSelector, "building"),
-              OsmDataQuery("landuse", OsmObject.WAY, landuseSelector, "landuse"),
-              OsmDataQuery("railway", OsmObject.WAY, railwaySelector, "railway"),
-              OsmDataQuery("amenity", OsmObject.WAYANDNODE, amenitySelector, "amenity"),
-              OsmDataQuery("leisure", OsmObject.WAYANDNODE, leisureSelector, "leisure"),
+              OsmDataQuery("buildings", OsmObject.WAY,
+                           buildingsSelector, "building"),
+              OsmDataQuery("landuse", OsmObject.WAY,
+                           landuseSelector, "landuse"),
+              OsmDataQuery("railway", OsmObject.WAY,
+                           railwaySelector, "railway"),
+              OsmDataQuery("amenity", OsmObject.WAYANDNODE,
+                           amenitySelector, "amenity"),
+              OsmDataQuery("leisure", OsmObject.WAYANDNODE,
+                           leisureSelector, "leisure"),
               OsmDataQuery("shop", OsmObject.NODE, shopSelector, "shop"),
               OsmDataQuery("craft", OsmObject.NODE, craftSelector, "craft"),
-]
+              ]
 
 osmDataFiles = OverPassHelper().fetch(pieschen.areaId(), areaName,
                                       osmQueries=osmQueries, overrideFiles=True)
@@ -69,7 +75,7 @@ for i, osmDataQuery in enumerate(osmDataFiles):
     objectGroups = groupBy(allObjects, osmDataQuery.groupByProperty)
 
     objectMap = generateFeatureCollection(
-        objectGroups, osmDataQuery.name, colormaps[i % len(colormaps)], osmDataQuery.groupByProperty)
+        objectGroups, colormaps[i % len(colormaps)], osmDataQuery)
     objectMap.add_to(map)
 
 folium.LayerControl().add_to(map)

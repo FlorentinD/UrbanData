@@ -7,6 +7,6 @@ class OsmDataQuery():
     name: str
     osmObject: OsmObjectType
     osmSelector: List
-    groupByProperty: str 
+    groupByProperty: str = ""
     filePath: str = None
     #colormap: str = "coolwarm"

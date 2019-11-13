@@ -40,15 +40,11 @@ allApartmentsCoordinates = list(enumerate([getCoordinates(apartment) for apartme
 objectGraph = nx.Graph()
 
 for index, ap1Coord in allApartmentsCoordinates:
-        # check if one of these point already in the apartmentGroups
-        # else start new group
-        # at the end need to try merging these groups (transitive) (if sets are not disjoint)
-        # finally use unary_union for one object per group
-
     objectGraph.add_node(index)
-    
+    # as intersection is symmetric looking at elements after current one is enough
     for otherIndex, ap2Coord in allApartmentsCoordinates[index+1:]: 
         # set & intersection would mess up ordering of points
+        # TODO: allow distance < 2 meters?
         if [point for point in ap1Coord if point in ap2Coord]:
             objectGraph.add_edge(index, otherIndex)
    
