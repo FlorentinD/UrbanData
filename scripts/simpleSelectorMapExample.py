@@ -7,8 +7,6 @@ from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
 from overpassHelper import OverPassHelper
 
-# TODO: adapt to new API 
-
 # postfix for f.i. file_names
 areaName = "pieschen" 
 # area to query
@@ -29,8 +27,7 @@ for i, osmQuery in enumerate(osmDataFiles):
     allObjects = json.load(file)
     objectGroups = groupBy(allObjects, osmQuery.groupByProperty)
 
-    objectMap = generateFeatureCollection(
-    objectGroups, osmQuery.name, colormaps[i % len(colormaps)], osmQuery.groupByProperty)
+    objectMap = generateFeatureCollection(objectGroups, colormaps[i % len(colormaps)], osmQuery.name)
     objectMap.add_to(map)
 
 folium.LayerControl().add_to(map)

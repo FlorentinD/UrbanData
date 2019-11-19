@@ -11,7 +11,6 @@ from OsmDataQuery import OsmDataQuery
 
 # TODO: groupby on either amenity or building? (overlapping) (layers based on multiple tags not on single tag)
 # TODO: layers Safety, Health, Leisure, Commercial (shops, craft, building manaufture, ...), Religion,
-# TODO: plot points as circle_markers as geojsontooltip PRs regarding this are not finished (see foliumhelper)
 
 # postfix for f.i. file_names
 areaName = "pieschen"
@@ -19,7 +18,7 @@ areaName = "pieschen"
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')
 
 streetsSelector = [
-    'highway~"primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|service|motorway"']
+    'highway~"primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|service|motorway|unclassified"']
 buildingsSelector = ['building~"industrial|cementry|school|commercial|office|kindergarten|manufacture|power|church|hotel|public|residential|supermarket|shop|ambulance-station|chapel|sports_centre|retail"',
                      "amenity!~'.'", "leisure!~'.'"]
 landuseSelector = ['landuse~"industrial|civic_admin|commercial|retail"',
@@ -75,7 +74,7 @@ for i, osmDataQuery in enumerate(osmDataFiles):
     objectGroups = groupBy(allObjects, osmDataQuery.groupByProperty)
 
     objectMap = generateFeatureCollection(
-        objectGroups, colormaps[i % len(colormaps)], osmDataQuery)
+        objectGroups, colormaps[i % len(colormaps)], osmDataQuery.name)
     objectMap.add_to(map)
 
 folium.LayerControl().add_to(map)

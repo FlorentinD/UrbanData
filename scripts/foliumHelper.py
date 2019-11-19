@@ -28,7 +28,7 @@ def collapseSubLayers(groupColorMap, groupsCount):
     return '\n'.join(layerDescription)
 
 
-def generateFeatureCollection(groups, colormapName, query: OsmDataQuery):
+def generateFeatureCollection(groups, colormapName: str, featureName: str):
     """groups: dictoniary with geojson.FeatureCollections as values"""
 
     colormap = matplotlib.cm.get_cmap(name=colormapName, lut=len(groups))
@@ -37,13 +37,21 @@ def generateFeatureCollection(groups, colormapName, query: OsmDataQuery):
     # groupSizes.sort(key=lambda tup: tup[1])
     groupColorMap = {key: cmMapColorToHex(
         colormap(i)) for i, (key, _) in enumerate(groups.items())}
-    groupsCount = {name: len(group["features"])
+
+    name = featureName
+
+    # TODO: move into collapseSubLayers
+    if len(groups.items()) > 1:
+        groupsCount = {name: len(group["features"])
                              for name, group in groups.items()}
-    featureCollection = folium.FeatureGroup(
-        name = query.name + collapseSubLayers(groupColorMap, groupsCount))
+        name += collapseSubLayers(groupColorMap, groupsCount)
+    else:
+        name += "({})".format((len(list(groups.values())[0]["features"])))
+    
+    featureCollection = folium.FeatureGroup(name = name)
 
     for type, group in groups.items():
-        # Self mapped as geojson layer not fully functional yet (open PRs
+        # Self mapped as geojson layer not fully functional yet (open PRs)
         for feature in group["features"]:
             geom = feature["geometry"]
             describtion = "<br>".join(["<b>{}</b>: {}".format(k, v) for k, v in feature["properties"].items()])
@@ -64,8 +72,22 @@ def generateFeatureCollection(groups, colormapName, query: OsmDataQuery):
                     loc, 
                     color=color, 
                     tooltip=describtion).add_to(featureCollection)
+            elif geom["type"] in ['MultiLineString', "Polygon"]:
+                loc = []
+                for lines in geom["coordinates"]:
+                    for lon, lat in lines:
+                        # !! switch lat and lon for correct representation
+                        loc.append((lat, lon))
+                folium.vector_layers.Polygon(loc, color=color, fill_color=color).add_to(featureCollection)
+            elif geom["type"] == "MultiPolygon":
+                loc = []
+                for polygon in geom["coordinates"]:
+                    for lines in polygon:
+                        [loc.append((lat, lon)) for point in lines]
+                        # !! switch lat and lon for correct representation
+                folium.vector_layers.Polygon(loc, color=color, fill_color=color).add_to(featureCollection)
             else:
-                raise ValueError("{} not mapped yet".format(geom["type"]))
+                raise ValueError("{} not mapped onto folium object yet".format(geom["type"]))
 
     #  layer = folium.GeoJson(
     #             group,

@@ -1,5 +1,5 @@
 import geojson
-
+from shapely.geometry import mapping
 
 def osmObjectsToGeoJSON(osmObject):
     """given a list osm-objects as json (! in geom out-format!)"""
@@ -32,6 +32,14 @@ def osmToGeoJsonGeometry(object):
         assert(len(points) == 1)
         return geojson.Point(points[0], validate=True)
 
+
+# TODO: extend with properties
+def shapeGeomToGeoJson(shapes):
+    features = []
+    for id, shape in enumerate(shapes):
+        geometry = mapping(shape)
+        features.append(geojson.Feature(id=id, geometry=geometry, properties=[]))
+    return geojson.FeatureCollection(features)
 
 # geoJsonGroupBy TODO: also retrieve schema info?
 def groupBy(featureCollection, properties):
