@@ -45,7 +45,7 @@ class HandelsregisterbotSpider(scrapy.Spider):
             companyDetails = metaData[0]
             if companyDetails["type"] == 'http://schema.org/LocalBusiness':
                 companyProperties = companyDetails["properties"]
-                yield CompanyLoader.createCompany(companyProperties)   
+                yield CompanyLoader().createCompany(companyProperties)   
             else:
                 raise ValueError("company details page did not contain localBusiness but {}".format(metaData))
 
