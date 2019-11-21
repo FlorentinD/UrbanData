@@ -17,19 +17,20 @@ class Company(scrapy.Item):
     pass
 
 class CompanyLoader():
-    def createCompany(properties):
+    def createCompany(self, properties):
         company = Company()
         company["name"] = properties["name"]
-        company["branch"] = properties.get("name", "None")
+        company["branch"] = properties.get("branch", "None")
 
         address = properties["address"]
         if isinstance(address, str):
-            company["address"] = address
+            if address == ",  ":
+                company["address"] = ""
         elif isinstance(address, dict) and address["type"] == 'http://schema.org/PostalAddress':
             address = address["properties"]
             company["address"] = "{}, {} {}".format(address["streetAddress"], address["postalCode"], address["addressLocality"]) 
         else:
-            company["address"] = str(address)
+            raise ValueError("unexpected address format {}".format(type(address))) 
     
         return company
 
