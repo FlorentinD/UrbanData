@@ -4,6 +4,7 @@ import re
 from companiesScraper.items import CompanyLoader
 from extruct.w3cmicrodata import MicrodataExtractor
 
+# scrapy crawl handelsregisterBot -o handelsregister_Dresden.csv --loglevel=ERROR
 class HandelsregisterbotSpider(scrapy.Spider):
     name = 'handelsregisterBot'
     #allowed_domains = ['https://www.online-handelsregister.de/handelsregisterauszug/sn/Dresden']
@@ -45,9 +46,13 @@ class HandelsregisterbotSpider(scrapy.Spider):
             companyDetails = metaData[0]
             if companyDetails["type"] == 'http://schema.org/LocalBusiness':
                 companyProperties = companyDetails["properties"]
-                yield CompanyLoader().createCompany(companyProperties)   
+                company = CompanyLoader().createCompanyFromLocalBusiness(companyProperties) 
+                if company:
+                    yield company
+                else:
+                    self.logger.error("Page: {} \n could not convert properties {}".format(response.url, companyProperties))  
             else:
-                raise ValueError("company details page did not contain localBusiness but {}".format(metaData))
+                self.logger.error("Page: {} \n company details page did not contain localBusiness but {}".format(response.url, metaData))
 
 
 # startPoint: css class "btn btn-lg btn-default" , href for list of companies starting with same letter

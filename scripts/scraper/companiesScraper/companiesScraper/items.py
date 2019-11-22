@@ -17,7 +17,7 @@ class Company(scrapy.Item):
     pass
 
 class CompanyLoader():
-    def createCompany(self, properties):
+    def createCompanyFromLocalBusiness(self, properties):
         company = Company()
         company["name"] = properties["name"]
         company["branch"] = properties.get("branch", "None")
@@ -30,7 +30,7 @@ class CompanyLoader():
             address = address["properties"]
             company["address"] = "{}, {} {}".format(address["streetAddress"], address["postalCode"], address["addressLocality"]) 
         else:
-            raise ValueError("unexpected address format {}".format(type(address))) 
+            company = None
     
         return company
 
