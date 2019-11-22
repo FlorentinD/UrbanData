@@ -1,41 +1,56 @@
 # -*- coding: utf-8 -*-
 import scrapy
+from companiesScraper.items import Company
 
-
+# scrapy crawl yellowPagesBot -o yellowPages_Dresden.csv --loglevel=ERROR
 class YellowpagesbotSpider(scrapy.Spider):
     name = 'yellowPagesBot'
-    allowed_domains = ['https://www.gelbeseiten.de/branchenbuch/staedte/sachsen/kreisfrei/Dresden/unternehmen/%23?page=1']
-    start_urls = ['http://https://www.gelbeseiten.de/branchenbuch/staedte/sachsen/kreisfrei/Dresden/unternehmen/%23?page=1/']
+    #allowed_domains = ['https://www.gelbeseiten.de/branchenbuch/staedte/sachsen/kreisfrei/Dresden/unternehmen/%23?page=1']
+    start_urls = ['https://www.gelbeseiten.de/branchenbuch/staedte/sachsen/kreisfrei/Dresden/unternehmen/%23?page=1/']
 
     def parse(self, response):
-		letterSections = response.css(".alphabetfilter__btn::attr(href)").extract()
+        letterSections = response.css(".alphabetfilter__btn::attr(href)").extract()
+        # as start_url already is a letterPage
+        self.parseLetterPage(response.url)
 
-		# as start_url is a letterPage
-		self.parseLetterPage(response.url)
+        for relLink in letterSections:
+            full_url = response.urljoin(relLink)
+            yield scrapy.Request(full_url, callback=self.parseLetterPage)
 
-		for relLink in letterSections:
-			full_url = response.urljoin(relLink)
-			yield scrapy.Request(full_url, callback=parseLetterPage) 
+    def parseLetterPage(self, response):
+        nextPage = response.css(".pagination__arrow.pagination__arrow--next").css("a::attr(href)").extract()
         
-	def parseLetterPage(self, response):
-		nextPage = response.css(".pagination__arrow.pagination__arrow--next").css("a::attr(href)").extract()
-		nextPageUrl = response.urljoin(nextPage) 
-		
-		# on last page next points to current page
-		if not (nextPageUrl == response.url):
-			yield scrapy.Request(nextPageUrl, callback=parseLetterPage)
+        if nextPage:
+            nextPageUrl = response.urljoin(nextPage[0]) 
+            # on last page next points to current page
+            if not (nextPageUrl == response.url):
+                yield scrapy.Request(nextPageUrl, callback=self.parseLetterPage)
 
-		companyPages = response.css(".link::attr(href)").extract()
+        companyPages = response.css(".link::attr(href)").extract()
 
-		for companyPage in companyPages:
-			# only for safety as these should be absolute links
-			companyPage = response.urljoin(companyPage)
-			yield scrapy.Request(companyPage, parseCompanyPage)
+        for companyPage in companyPages:
+            # only for safety as these should be absolute links
+            companyPage = response.urljoin(companyPage)
+            yield scrapy.Request(companyPage, callback=self.parseCompanyPage)
 
-	def parseCompanyPage(self, response):
-		# TODO: find branch and co
-		pass
+    def parseCompanyPage(self, response):
+        branchAndDetailBox = response.css(".mod-TeilnehmerKopf__teilnehmerdaten-wrapper")
+        detailBox = branchAndDetailBox.css(".mod-TeilnehmerKopf__teilnehmerdaten")
+        streetAndPostalCode = detailBox.css(".mod-TeilnehmerKopf__adresse-daten::text").extract()
+        city = detailBox.css(".mod-TeilnehmerKopf__teilnehmerdaten").css(".mod-TeilnehmerKopf__adresse-daten--noborder::text").extract()
+        name = detailBox.css(".mod-TeilnehmerKopf__name::text").extract()
+        company = Company()
+        company["branch"] = ";".join(branchAndDetailBox.css(".mod-TeilnehmerKopf__branchen").css(".list-unstyled").css("li::text").extract())
 
+        if len(streetAndPostalCode) == 2 and city and name:
+            company["name"] = name[0]
+            street = streetAndPostalCode[0]
+            postalCode = streetAndPostalCode[1]
+            company["address"] = "{}, {} {}".format(street, postalCode, city[0])
+            yield company
+        else:
+            self.logger.error("Missing address information name: {}, {}, city: {}".format(name, streetAndPostalCode, city))
+        
 
 # ! start_url already contains links
 # <a class="alphabetfilter__btn" href="%23?page=1" data-char="#">#</a> single letter buttons
@@ -43,24 +58,4 @@ class YellowpagesbotSpider(scrapy.Spider):
 # <div class="pagination__arrow pagination__arrow--next"><a rel="next" href="a?page=2" class="gs-btn gs-btn--icon gs-btn--icon-r gs-btn--s gs-btn--bordered">
 
 # single company pages (name, address, typ, website)
-#   <li class="mod-Kontaktdaten__list-item">
-			# 	<i class="icon-name"></i>
-			# 	<address>
-			# 		<strong>0-24 Schulze Schlüsseldienst Pieschen Trachau</strong>
-			# 		<p>Alaunstr. 84</p>
-			# 		<p>01099 Dresden-Äußere Neustadt</p>
-			# 	</address>
-			# </li>
-    # <section id="branchen_und_stichworte">
-	# 		<h2>Branche</h2>
-	# 	<div class="mod mod-BranchenUndStichworte">
-	# 		Schlüsseldienste
-	# 	</div>
-	# 		<h2>Stichworte</h2>
         
-    # <a href="http://www.schulze-schluesseldienst-01099.de" target="_blank" title="http://www.schulze-schluesseldienst-01099.de" data-wipe="{"listener":"click", "name":"Detailseite Aktionsleiste Webadresse", "id":"1120091185890"}">
-	# <div class="button">
-	# 				<i class="icon-homepage"></i>
-	# 				<span>Website</span>
-	# 			</div>
-	# 		</a>
