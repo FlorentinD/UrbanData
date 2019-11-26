@@ -3,6 +3,7 @@ import scrapy
 from companiesScraper.items import Company
 
 # scrapy crawl yellowPagesBot -o yellowPages_Dresden.csv --loglevel=ERROR
+# some companies only have a telefon number but no address incl. Buergerbueros
 class YellowpagesbotSpider(scrapy.Spider):
     name = 'yellowPagesBot'
     #allowed_domains = ['https://www.gelbeseiten.de/branchenbuch/staedte/sachsen/kreisfrei/Dresden/unternehmen/%23?page=1']
@@ -42,14 +43,18 @@ class YellowpagesbotSpider(scrapy.Spider):
         company = Company()
         company["branch"] = ";".join(branchAndDetailBox.css(".mod-TeilnehmerKopf__branchen").css(".list-unstyled").css("li::text").extract())
 
-        if len(streetAndPostalCode) == 2 and city and name:
+        # city not needed, if street and postalcode are given
+        if len(streetAndPostalCode) == 2 and name:
             company["name"] = name[0]
-            street = streetAndPostalCode[0]
-            postalCode = streetAndPostalCode[1]
-            company["address"] = "{}, {} {}".format(street, postalCode, city[0])
+            company["street"] = streetAndPostalCode[0]
+            company["postalCode"] = streetAndPostalCode[1]
+            if(city):
+                company["area"] = city
+            else:
+                company["area"] = ""
             yield company
         else:
-            self.logger.error("Missing address information name: {}, {}, city: {}".format(name, streetAndPostalCode, city))
+            self.logger.error("Missing address information name: {}, {}, city: {} .. url: {}".format(name, streetAndPostalCode, city, response.url))
         
 
 # ! start_url already contains links

@@ -10,7 +10,10 @@ import scrapy
 
 class Company(scrapy.Item):
     name = scrapy.Field()
-    address = scrapy.Field()
+    street = scrapy.Field()
+    postalCode = scrapy.Field()
+    # simliar to city f.i. Dresden-Pieschen but could also be just Dresden
+    area = scrapy.Field()
     branch = scrapy.Field()
     # define the fields for your item here like:
     # name = scrapy.Field()
@@ -20,7 +23,7 @@ class CompanyLoader():
     def createCompanyFromLocalBusiness(self, properties):
         company = Company()
         company["name"] = properties["name"]
-        company["branch"] = properties.get("branch", "None")
+        company["branch"] = properties.get("branch", "")
 
         address = properties["address"]
         if isinstance(address, str):
@@ -28,7 +31,9 @@ class CompanyLoader():
                 company["address"] = ""
         elif isinstance(address, dict) and address["type"] == 'http://schema.org/PostalAddress':
             address = address["properties"]
-            company["address"] = "{}, {} {}".format(address["streetAddress"], address["postalCode"], address["addressLocality"]) 
+            company["street"] = address["streetAddress"]
+            company["postalCode"] = address["postalCode"]
+            company["area"] = address["addressLocality"]
         else:
             company = None
     
