@@ -11,7 +11,7 @@ from overpassHelper import OverPassHelper
 from OsmDataQuery import OsmDataQuery
 from OsmObjectType import OsmObjectType
 from foliumHelper import generateFeatureCollection
-from jsonToGeoJSON import shapeGeomToGeoJson
+from geoJsonHelper import shapeGeomToGeoJson
 
 
 # find building complexes by union geometry of buildings with >1 common point

@@ -1,7 +1,7 @@
 import json
 import folium
 from matplotlib import cm
-from jsonToGeoJSON import groupBy
+from geoJsonHelper import groupBy
 from foliumHelper import generateFeatureCollection, styleFunction, cmMapColorToHex
 from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl

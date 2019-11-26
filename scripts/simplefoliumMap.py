@@ -1,6 +1,6 @@
 import json
 import folium
-from jsonToGeoJSON import groupBy
+from geoJsonHelper import groupBy
 from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
 

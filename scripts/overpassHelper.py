@@ -2,7 +2,7 @@
 from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
 from pathlib import Path
-from jsonToGeoJSON import osmObjectsToGeoJSON
+from geoJsonHelper import osmObjectsToGeoJSON
 import geojson
 from typing import Dict, List
 from OsmDataQuery import OsmDataQuery
