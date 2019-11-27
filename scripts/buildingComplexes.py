@@ -10,8 +10,8 @@ from OSMPythonTools.nominatim import Nominatim
 from overpassHelper import OverPassHelper
 from OsmDataQuery import OsmDataQuery
 from OsmObjectType import OsmObjectType
-from foliumHelper import generateFeatureCollection
-from geoJsonHelper import shapeGeomToGeoJson
+from foliumHelper import geoFeatureCollectionToFoliumFeatureGroup
+from geoJsonHelper import shapeGeomToGeoJson, unionFeatureCollections
 
 
 # find building complexes by union geometry of buildings with >1 common point
@@ -23,17 +23,16 @@ def getCoordinates(building):
     else:
         raise ValueError(building + " has no geometry")
 
-
+# TODO: add "railway" to borders
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')
-osmQuery = [OsmDataQuery("homes", OsmObjectType.WAY, ['building~"apartments|terrace|house"', 'abandoned!~"yes"']),
+osmQueries = [OsmDataQuery("homes", OsmObjectType.WAY, ['building~"apartments|terrace|house"', 'abandoned!~"yes"']),
             OsmDataQuery("borders", OsmObjectType.WAY,  
-            ['highway~"primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|motorway|unclassified"'])]
+            ['highway~"primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|motorway|unclassified"']),
+            OsmDataQuery("borders_railway", OsmObjectType.WAY, ["'railway'~'rail'"])]
 
-osmResolvedDataQueries = OverPassHelper().fetch(pieschen.areaId(), "pieschen", osmQuery)
+osmData = OverPassHelper().directFetch(pieschen.areaId(), "pieschen", osmQueries)
 
-resolvedQuery = osmResolvedDataQueries[0]
-file = open(resolvedQuery.filePath, encoding='UTF-8')
-allApartments = json.load(file)
+allApartments = next(osmData)
 
 allApartmentsCoordinates = list(enumerate([getCoordinates(apartment) for apartment in allApartments["features"]]))
 objectGraph = nx.Graph()
@@ -61,10 +60,8 @@ print("ApartmentGroups: {}".format(len(apartmentGroups)))
 ########## ApartmentGroups expansion (if no borders inbetween -> union)
 
 # borders between building-complexes
-resolvedQuery = osmResolvedDataQueries[1]
-file = open(resolvedQuery.filePath, encoding='UTF-8')
-bordersGeoJson = json.load(file)
-bordersShapelyLines = [shape(street["geometry"]) for street in bordersGeoJson["features"]] 
+borders = unionFeatureCollections(*list(osmData))
+bordersShapelyLines = [shape(street["geometry"]) for street in borders["features"]] 
 
 aparmentGroupGraph = nx.Graph()
 apartmentGroupCenters = list(enumerate([group.centroid for group in apartmentGroups]))
@@ -119,13 +116,16 @@ pieschenCoord = pieschen.toJSON()[0]
 map = folium.Map(
     location=[51.088534,13.723315], tiles='Open Street Map', zoom_start=15)
 
-buildingGroupsFeature = generateFeatureCollection({"filler" : geoJsonApartmentGroups}, "BrBG", "apartment groups")
+geoFeatureCollectionToFoliumFeatureGroup(allApartments, "black", name="Single apartments").add_to(map)
+
+bordersFeature = geoFeatureCollectionToFoliumFeatureGroup(borders, "red", "borders")
+bordersFeature.add_to(map)
+
+buildingGroupsFeature = geoFeatureCollectionToFoliumFeatureGroup(geoJsonApartmentGroups, "blue", "apartment groups")
 buildingGroupsFeature.add_to(map)
 
-buildingRegionsFeature = generateFeatureCollection({"filler" : geoJsonApartmentRegions}, "hsv", "apartment regions")
+buildingRegionsFeature = geoFeatureCollectionToFoliumFeatureGroup(geoJsonApartmentRegions, "green", "apartment regions")
 buildingRegionsFeature.add_to(map)
-
-folium.GeoJson(allApartments, name="Single apartments", show=True).add_to(map)
 
 folium.LayerControl().add_to(map)
 

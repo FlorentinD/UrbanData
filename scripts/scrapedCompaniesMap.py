@@ -21,9 +21,6 @@ pieschenCoord = pieschen.toJSON()[0]
 map = folium.Map(
     location=[pieschenCoord["lat"], pieschenCoord["lon"]], tiles='Stamen Toner', zoom_start=15)
 
-# matplotlib colormap names
-colormaps = ["hsv", "BrBG", "coolwarm"]
-
 #yellowPages
 file = open("out/data/scraper/yellowPages_Dresden_Pieschen.json", encoding='UTF-8')
 yellowCompanies = json.load(file)
