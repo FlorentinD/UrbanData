@@ -28,7 +28,7 @@ colormaps = ["hsv", "BrBG", "coolwarm"]
 file = open("out/data/scraper/yellowPages_Dresden_Pieschen.json", encoding='UTF-8')
 yellowCompanies = json.load(file)
 
-yellowFeature = geoFeatureCollectionToFoliumFeatureGroup(yellowCompanies, "pink", "yellowPages", switchLatAndLong = False)
+yellowFeature = geoFeatureCollectionToFoliumFeatureGroup(yellowCompanies, "yellow", "yellowPages", switchLatAndLong = False)
 yellowFeature.add_to(map)
 
 
@@ -37,6 +37,13 @@ file2 = open("out/data/scraper/handelsregister_Dresden_Pieschen.json", encoding=
 handelsRegisterCompanies = json.load(file2)
 
 registerFeature = geoFeatureCollectionToFoliumFeatureGroup(handelsRegisterCompanies, "blue", "handelsRegister", switchLatAndLong = False)
+registerFeature.add_to(map)
+
+# buildingRegions
+file2 = open("out/data/apartmentRegions_pieschen.json", encoding='UTF-8')
+handelsRegisterCompanies = json.load(file2)
+
+registerFeature = geoFeatureCollectionToFoliumFeatureGroup(handelsRegisterCompanies, "green", "ApartmentRegions", switchLatAndLong = True)
 registerFeature.add_to(map)
 
 folium.LayerControl().add_to(map)
