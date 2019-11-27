@@ -5,15 +5,11 @@
 * Install dependencies
 * Look at the notebooks or scripts (f.i. `scripts/complexFoliumMap`)
 
-## Todo
+## Furher directions 
 
-- [ ] Find working python framework for newer WMS versions (not really a high priotity if WFS service works) (may be supported directly by folium)
-- [x] How to convert json from overpassQL to geojson (works for current queries)
-- [ ] How to translate gml into geojson? (not convertable with ogr?)
-- [x] GeoPandas? (takes very long to load file, probably because multipoint lines get transformed to normal lines)
-- [ ] ?create layer images (better performance, but not interactive (what informations to display?))
+* use streamlit for interactive web app
   
-## Package dependency
+## Package dependency (outdated)
 
 - OWSLib (for request on WMS and WFS for openDataDresden)
 - OSMPythonTools (for access to openstreetmap services)

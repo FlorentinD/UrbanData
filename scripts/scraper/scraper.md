@@ -1,9 +1,12 @@
 # Scrapping data
 
 * yellow pages
-    
+  * many entries without useable address (f.i. street is missing) 
+  * classification of companies by branch
+   
 * handelsregister (umfangreicher)
   * https://www.online-handelsregister.de/handelsregisterauszug/sn/Dresden
+  * well structured and complete data (uses standarised localbusiness schema)
 
 
 ## Execution
