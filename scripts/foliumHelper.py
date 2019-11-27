@@ -126,6 +126,6 @@ def generateFeatureCollection(groups, colormapName: str, featureName: str):
     
     for type, group in groups.items():
         color = groupColorMap[type]
-        featureGroup = generateFeatureCollection(group, color, type)
+        featureGroup = geoFeatureCollectionToFoliumFeatureGroup(group, color, type)
         featureGroup.add_to(layer)
     return layer
