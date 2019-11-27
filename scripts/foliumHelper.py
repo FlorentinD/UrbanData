@@ -6,6 +6,7 @@ from OsmDataQuery import OsmDataQuery
 from OsmObjectType import OsmObjectType
 from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
+import re
 
 
 def cmMapColorToHex(color):
@@ -22,17 +23,31 @@ def styleFunction(colorMap, property: str):
 
 def collapseSubLayers(groupColorMap, groupsCount):
     """ generaters HTML to show in layer control """
-    itemString = "<span style='color:{}'> <br> &nbsp; {} ({}) </span>"
-    layerDescription = [itemString.format(
-        color, name, groupsCount[name]) for name, color in groupColorMap.items()]
+    layerDescription = [enhanceFeatureName(name, color, groupsCount[name]) for name, color in groupColorMap.items()]
     return '\n'.join(layerDescription)
 
+
+def enhanceFeatureName(name, color, count) -> str:
+    """adding count and value to the name as HTML span element"""
+    itemString = "<span style='color:{}'> {} ({}) </span>"
+    return itemString.format(color, name, count)
+
+def escapePropertyValue(value):
+    if isinstance(value, str):
+        return value.replace("`", "\`")
+    if isinstance(value, list):
+        return [escapePropertyValue(v) for v in value]
+    else:
+        return value
+
 def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, switchLatAndLong = True):
+    name = enhanceFeatureName(name, color, len(geoFeatureCollection["features"]))
     featureCollection = folium.FeatureGroup(name = name)
     # Self mapped as geojson layer not fully functional yet (open PRs)
     for feature in geoFeatureCollection["features"]:
             geom = feature["geometry"]
-            describtion = "<br>".join(["<b>{}</b>: {}".format(k, v) for k, v in feature["properties"].items()])
+            # ` was not allowed in Leatleaf JS 
+            describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items() if v])
             if geom["type"] == "Point":
                 loc = geom["coordinates"]
                 if switchLatAndLong:
