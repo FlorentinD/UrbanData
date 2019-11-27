@@ -102,6 +102,9 @@ for component in groupExpansionComponents:
 
 print("ApartmentRegions: {}".format(len(apartmentRegions)))
 
+geoJsonApartmentGroups = shapeGeomToGeoJson(apartmentGroups)
+geoJsonApartmentRegions = shapeGeomToGeoJson(apartmentRegions)
+
 with open("out/data/apartmentGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(geoJsonApartmentGroups, outfile)
 
@@ -109,9 +112,6 @@ with open("out/data/apartmentRegions_pieschen.json", 'w', encoding='UTF-8') as o
             geojson.dump(geoJsonApartmentRegions, outfile)
 
 ######### Visual 
-
-geoJsonApartmentGroups = shapeGeomToGeoJson(apartmentGroups)
-geoJsonApartmentRegions = shapeGeomToGeoJson(apartmentRegions)
 
 areaName = "pieschen"
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')

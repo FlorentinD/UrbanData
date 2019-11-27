@@ -1,7 +1,7 @@
 import json
 import folium
 from matplotlib import cm
-from geoJsonHelper import groupBy
+from geoJsonHelper import groupBy, unionFeatureCollections
 from foliumHelper import geoFeatureCollectionToFoliumFeatureGroup
 from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
@@ -33,15 +33,30 @@ yellowFeature.add_to(map)
 
 
 # handels register
-file2 = open("out/data/scraper/handelsregister_Dresden_Pieschen.json", encoding='UTF-8')
-handelsRegisterCompanies = json.load(file2)
+file = open("out/data/scraper/handelsregister_Dresden_Pieschen.json", encoding='UTF-8')
+handelsRegisterCompanies = json.load(file)
 
 registerFeature = geoFeatureCollectionToFoliumFeatureGroup(handelsRegisterCompanies, "blue", "handelsRegister", switchLatAndLong = False)
 registerFeature.add_to(map)
 
+
+# osm companies: often specify a name ? (tourism for holiday apartments f.i. , ... see data to collect)
+namedAmenitiesThings = OsmDataQuery("osm_named_amenities", OsmObject.WAYANDNODE, ["name", "amenity",'"amenity"!~"vending_machine|parking"'], "")
+namedLeisureThings = OsmDataQuery("osm_named_leisure", OsmObject.WAYANDNODE, ["name", "leisure", 'amenity!~"."'], "")
+namedShopsThings = OsmDataQuery("osm_named_shops", OsmObject.WAYANDNODE, ["name", "shop", 'amenity!~"."', 'leisure!~"."'], "")
+namedCraftThings = OsmDataQuery("osm_named_crafts", OsmObject.WAYANDNODE, ["name", "craft", 'amenity!~"."','leisure!~"."', 'shop!~"."'], "")
+namedCompaniesThings = OsmDataQuery("osm_named_companies", OsmObject.WAYANDNODE, ["name", "company", 'amenity!~"."','leisure!~"."', 'shop!~"."','craft!~"."'], "")
+osmQueries = [namedAmenitiesThings, namedCompaniesThings, namedCraftThings, namedCompaniesThings, namedShopsThings]
+osmData = OverPassHelper().directFetch(pieschen.areaId(), areaName, osmQueries=osmQueries)
+
+unionData = unionFeatureCollections(*osmData)
+
+osmFeature = geoFeatureCollectionToFoliumFeatureGroup(unionData, "pink", "Named amenities/leisure/shops/craft/companies in osm", switchLatAndLong = True)
+osmFeature.add_to(map)
+
 # buildingRegions
-file2 = open("out/data/apartmentRegions_pieschen.json", encoding='UTF-8')
-handelsRegisterCompanies = json.load(file2)
+file = open("out/data/apartmentRegions_pieschen.json", encoding='UTF-8')
+handelsRegisterCompanies = json.load(file)
 
 registerFeature = geoFeatureCollectionToFoliumFeatureGroup(handelsRegisterCompanies, "green", "ApartmentRegions", switchLatAndLong = True)
 registerFeature.add_to(map)

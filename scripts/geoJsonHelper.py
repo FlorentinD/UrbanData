@@ -60,7 +60,16 @@ def groupBy(featureCollection, properties):
             groups[groupByValue].append(row)
     return {key: geojson.FeatureCollection(group) for key, group in groups.items()}
 
-
+def unionFeatureCollections(*collections):
+    features = []
+    for collection in collections:
+        if collection["type"] == "FeatureCollection":
+            collectionFeatures = collection["features"]
+            features.extend(collectionFeatures)
+        if collection["type"] == "Feature":
+            features.append(collection)
+    return geojson.FeatureCollection(features)
+    
 def getSchema(featureCollection, amount:int=10):
     properties = {}
     for feature in featureCollection["features"]:
