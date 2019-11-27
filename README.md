@@ -7,7 +7,8 @@
 
 ## Furher directions 
 
-* use streamlit for interactive web app
+* union company data sources (osm, yellowpage, handelsregister)
+* use streamlit for interactive web app (allowing to add layers and so on)
   
 ## Package dependency (outdated)
 
