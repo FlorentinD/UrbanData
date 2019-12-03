@@ -41,8 +41,11 @@ def escapePropertyValue(value):
         return value
 
 def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, switchLatAndLong = True):
+    """from geojson feature collection to folium feature group"""
     name = enhanceFeatureName(name, color, len(geoFeatureCollection["features"]))
     featureCollection = folium.FeatureGroup(name = name)
+
+    propertyKeysForPolygon = ["area", "building"]
     # Self mapped as geojson layer not fully functional yet (open PRs)
     for feature in geoFeatureCollection["features"]:
             geom = feature["geometry"]
@@ -67,10 +70,19 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                             for point in geom["coordinates"]]
                 else:
                     loc = geom["coordinates"]
-                folium.vector_layers.PolyLine(
-                    loc, 
-                    color=color, 
-                    tooltip=describtion).add_to(featureCollection)
+
+                # properties leading to a closed area   
+                if (feature["properties"] and set(feature["properties"].keys()).intersection(propertyKeysForPolygon)):
+                    folium.vector_layers.Polygon(
+                        loc,
+                        tooltip=describtion,  
+                        color=color,
+                        fill_color=color).add_to(featureCollection)
+                else:
+                    folium.vector_layers.PolyLine(
+                        loc, 
+                        color=color, 
+                        tooltip=describtion).add_to(featureCollection)
             elif geom["type"] in ['MultiLineString', "Polygon"]:
                 loc = []
                 for lines in geom["coordinates"]:
@@ -79,7 +91,11 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                             loc.append((lat, lon))
                         else:
                             loc.append((lon, lat))
-                folium.vector_layers.Polygon(loc, color=color, fill_color=color).add_to(featureCollection)
+                folium.vector_layers.Polygon(
+                    loc, 
+                    tooltip=describtion, 
+                    color=color, 
+                    fill_color=color).add_to(featureCollection)
             elif geom["type"] == "MultiPolygon":
                 loc = []
                 for polygon in geom["coordinates"]:
@@ -88,7 +104,7 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                             [loc.append((lat, lon)) for point in lines]
                         else:
                           [loc.append((lon, lat)) for point in lines]  
-                folium.vector_layers.Polygon(loc, color=color, fill_color=color).add_to(featureCollection)
+                folium.vector_layers.Polygon(loc, tooltip=describtion, color=color, fill_color=color).add_to(featureCollection)
             else:
                 raise ValueError("{} not mapped onto folium object yet".format(geom["type"]))
         #  layer = folium.GeoJson(
