@@ -15,6 +15,7 @@ class Localizer():
         osmObjects = Overpass().query(query).toJSON()["elements"]
         for element in osmObjects:
             element["tags"] = {key: value for (key, value) in element["tags"].items() if key.startswith("addr:")}
+        # TODO: use R-tree for location based search?
         self.areaObjects = osmObjectsToGeoJSON(osmObjects)["features"]
 
 
@@ -34,21 +35,30 @@ class Localizer():
                 return location["geometry"]
         return None
     
-    def annotateWithAddress(self, building):
+    def annotateWithAddresses(self, building):
         """based on building geometry searches the address"""
         buildingGeometry = shape(building["geometry"])
-        addresses = []
-        for location in self.areaObjects:
-            # TODO: could be done in init step
-            locationGeometry = shape(location["geometry"])
-            if buildingGeometry.contains(locationGeometry):
-                address = {
-                    "addr:street": location["properties"].get("addr:street", None),
-                    "addr:housenumber": location["properties"].get("addr:housenumber", None),
-                    "addr:postcode": location["properties"].get("addr:postcode", None),
-                }
-                addresses.append(address)
+        containsAddress = [key for key in building["properties"].keys() if key.startswith("addr:")]
+        if containsAddress:
+            addresses = [{
+                    "addr:street": building["properties"].get("addr:street", None),
+                    "addr:housenumber": building["properties"].get("addr:housenumber", None),
+                    "addr:postcode": building["properties"].get("addr:postcode", None),
+                }]
+        else:
+            addresses = []
+            for location in self.areaObjects:
+                # TODO: could be done in init step
+                locationGeometry = shape(location["geometry"])
+                if buildingGeometry.contains(locationGeometry):
+                    address = {
+                       "addr:street": location["properties"].get("addr:street", None),
+                        "addr:housenumber": location["properties"].get("addr:housenumber", None),
+                        "addr:postcode": location["properties"].get("addr:postcode", None),
+                    }
+                    addresses.append(address)
         # TODO: could be mapping street -> list of house number
+        # ! can still be empty (f.i. https://www.openstreetmap.org/way/35540321 or https://www.openstreetmap.org/way/32610207) could only be solved by taking nearest element with address 
         building["properties"]["addresses"] = addresses
         return building
 

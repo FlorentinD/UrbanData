@@ -32,14 +32,9 @@ def osmToGeoJsonGeometry(object):
         assert(len(points) == 1)
         return geojson.Point(points[0], validate=True)
 
-
-# TODO: extend with properties
-def shapeGeomToGeoJson(shapes):
-    features = []
-    for id, shape in enumerate(shapes):
-        geometry = mapping(shape)
-        features.append(geojson.Feature(id=id, geometry=geometry, properties=[]))
-    return geojson.FeatureCollection(features)
+def shapeGeomToGeoJson(shape, properties = None):
+    geometry = mapping(shape)
+    return geojson.Feature(geometry=geometry, properties=properties)
 
 # geoJsonGroupBy TODO: also retrieve schema info?
 def groupBy(featureCollection, properties):

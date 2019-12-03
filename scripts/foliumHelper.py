@@ -44,7 +44,7 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
     """from geojson feature collection to folium feature group"""
     name = enhanceFeatureName(name, color, len(geoFeatureCollection["features"]))
     featureCollection = folium.FeatureGroup(name = name)
-
+    
     propertyKeysForPolygon = ["area", "building"]
     # Self mapped as geojson layer not fully functional yet (open PRs)
     for feature in geoFeatureCollection["features"]:
@@ -70,8 +70,7 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                             for point in geom["coordinates"]]
                 else:
                     loc = geom["coordinates"]
-
-                # properties leading to a closed area   
+ 
                 if (feature["properties"] and set(feature["properties"].keys()).intersection(propertyKeysForPolygon)):
                     folium.vector_layers.Polygon(
                         loc,
