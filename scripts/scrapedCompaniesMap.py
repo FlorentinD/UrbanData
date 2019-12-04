@@ -19,7 +19,7 @@ pieschen = Nominatim().query('Pieschen, Dresden, Germany')
 
 pieschenCoord = pieschen.toJSON()[0]
 map = folium.Map(
-    location=[pieschenCoord["lat"], pieschenCoord["lon"]], tiles='Stamen Toner', zoom_start=15)
+    location=[pieschenCoord["lat"], pieschenCoord["lon"]], tiles='Open Street Map', zoom_start=15)
 
 #yellowPages
 file = open("out/data/scraper/yellowPages_Dresden_Pieschen.json", encoding='UTF-8')
@@ -44,7 +44,7 @@ namedShopsThings = OsmDataQuery("osm_named_shops", OsmObject.WAYANDNODE, ["name"
 namedCraftThings = OsmDataQuery("osm_named_crafts", OsmObject.WAYANDNODE, ["name", "craft", 'amenity!~"."','leisure!~"."', 'shop!~"."'], "")
 namedCompaniesThings = OsmDataQuery("osm_named_companies", OsmObject.WAYANDNODE, ["name", "company", 'amenity!~"."','leisure!~"."', 'shop!~"."','craft!~"."'], "")
 osmQueries = [namedAmenitiesThings, namedCompaniesThings, namedCraftThings, namedCompaniesThings, namedShopsThings]
-osmData = OverPassHelper().directFetch(pieschen.areaId(), areaName, osmQueries=osmQueries)
+osmData = OverPassHelper().directFetch(areaId=pieschen.areaId(), osmQueries=osmQueries)
 
 unionData = unionFeatureCollections(*osmData)
 
