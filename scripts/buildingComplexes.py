@@ -13,28 +13,39 @@ from OsmObjectType import OsmObjectType
 from foliumHelper import geoFeatureCollectionToFoliumFeatureGroup
 from geoJsonHelper import shapeGeomToGeoJson, unionFeatureCollections
 from localizer import Localizer
-
-
-# find building complexes by union geometry of buildings with >1 common point
-# use unary_union from shapely.ops to merge complexes to one
+from collections import defaultdict
 
 # TODO: also use "flurstuecke" from openDataDresden ?
 
 # TODO: take all buildings for regions and per region count number of living apartment, companies, ... (for showing percentage)
-# TODO: add properties to regions (f.i. addresses ! nearly always stored inside nodes, not in the building)
+# TODO: Use geopandas ? or look for other ways to increase performance
 
-def getCoordinates(building):
-    """extracts coordinates from a geojson object"""
-    if "geometry" in building:
-        return building["geometry"]["coordinates"]
-    else:
-        raise ValueError(building + " has no geometry")
+def analyseProperties(properties):
+    # ! annotate each bulding with region id and then map afterwards again ... (takes to long in one run -> harder to test)
+    # TODO: function to map region id based for an object (based on address or just geometry)
+    # tag order to analyse: public, leisure, amenity, buldings, landuse, office ? ... check if company?
+    # apartments -> use building:levels and roof:levels for levels (assume 3-4 ?)
+    #   https://wiki.openstreetmap.org/wiki/Key:building:levels
+    # house : assume one level ? (if none given)
+    # terrace: sequence of houses -> count addresses contained (implicit number of entrances) (assume 1 lvl per house?)
+    """analyses properties of building in a building group"""
+    # can be used later to aggregate towards regions
+    return 0
 
+def unionAddresses(dics):
+    union = defaultdict(list)
+    for dic in dics:
+        for key, value in dic.items():
+            if not value == Localizer.DEFAULT_HOUSENUMBER:
+                union[key].extend(value)
+    return dict(union)
 
 homesSelector = ['building~"apartments|terrace|house"', 'abandoned!~"yes"']
-homesQuery = OsmDataQuery("homes", OsmObjectType.WAY, ['building~"apartments|terrace|house"', 'abandoned!~"yes"'])
+homesQuery = OsmDataQuery("homes", OsmObjectType.WAY, homesSelector)
 
-addressSelector = ['addr:housenumber','addr:street', '!building']
+
+# later in group look for homes -> living area ; companies -> company area ; abandoned -> unused area?; .... 
+allBuildingsQuery = OsmDataQuery("homes", OsmObjectType.WAY, ['"building"', 'abandoned!~"yes"'])
 
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')
 osmQueries = [ homesQuery,
@@ -42,34 +53,38 @@ osmQueries = [ homesQuery,
             ['highway~"primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|motorway|unclassified"']),
             OsmDataQuery("borders_railway", OsmObjectType.WAY, ["'railway'~'rail'"])]
 
-osmData = OverPassHelper().directFetch(pieschen.areaId(), "pieschen", osmQueries)
+osmData = OverPassHelper().directFetch(pieschen.areaId(), osmQueries)
 
 allHomes = next(osmData)
+
+# Poor Mans Testing
+# allHomes = geojson.FeatureCollection(allHomes["features"][:50])
+
 localizer = Localizer('Pieschen, Dresden, Germany')
 # TODO check if not already annotaded file exists 
 [localizer.annotateWithAddresses(home) for home in allHomes["features"]]
 
-print("Annoted buildings with addresses")
+print("Annotated {} buildings with addresses".format(len(allHomes["features"])))
 
-allApartmentsCoordinates = list(enumerate([getCoordinates(apartment) for apartment in allHomes["features"]]))
+allApartmentsShapeGeom = list(enumerate([shape(apartment["geometry"]) for apartment in allHomes["features"]]))
 objectGraph = nx.Graph()
 
 # TODO: only do this if specified (only useful if area contains many blocks)
-for index, ap1Coord in allApartmentsCoordinates:
+for index, shape1 in allApartmentsShapeGeom:
     objectGraph.add_node(index)
     # as intersection is symmetric looking at elements after current one is enough
-    for otherIndex, ap2Coord in allApartmentsCoordinates[index+1:]: 
-        # set & intersection would mess up ordering of points
-        # TODO: allow distance < 2 meters?
-        if [point for point in ap1Coord if point in ap2Coord]:
+    for otherIndex, shape2 in allApartmentsShapeGeom[index+1:]: 
+        if shape1.touches(shape2):
             objectGraph.add_edge(index, otherIndex)
    
 apartmentComponents = nx.connected_components(objectGraph)
 
 apartmentGroups = []
 for indexes in apartmentComponents:
-    apartments = [Polygon(allApartmentsCoordinates[index][1]) for index in indexes]
-    # also save indexes to fetch && aggregate properties at the end
+    # [1] as first one is index created by enumerate
+    # TODO: also save buildingIds (extra class BuildingComplex)
+    apartments = [allApartmentsShapeGeom[index][1] for index in indexes]
+    # also save indexes to fetch && aggregate properties at the end 
     apartmentComplex = (list(indexes), unary_union(apartments))
     apartmentGroups.append(apartmentComplex)
 
@@ -85,7 +100,9 @@ aparmentGroupGraph = nx.Graph()
 apartmentGroupCenters = list(enumerate([group.centroid.coords[0] for _, group in apartmentGroups]))
 
 added_edges = 0
-edges = folium.FeatureGroup("edges between home-groups")
+visualize_edges = True
+if visualize_edges:
+    edges = folium.FeatureGroup("edges between home-groups")
 
 for index, center1 in apartmentGroupCenters:
     if(index % 50 == 0):
@@ -94,13 +111,13 @@ for index, center1 in apartmentGroupCenters:
     aparmentGroupGraph.add_node(index)
     
     for otherIndex, center2 in apartmentGroupCenters[index+1:]:
-        # more than 80 meters inbetween -> very likely something in between
+        # more than 120 meters inbetween -> very likely something in between
         if distance(center1, center2).meters < 120:
             connection = LineString(coordinates=[center1, center2])
             crossesStreet = True in [street.crosses(
                 connection) for street in bordersShapelyLines]
-            # TODO: only do this if f.i. visualize checked connections flag is set
-            folium.vector_layers.PolyLine([(center1[1], center1[0]), (center2[1], center2[0])]).add_to(edges)
+            if visualize_edges:
+                folium.vector_layers.PolyLine([(center1[1], center1[0]), (center2[1], center2[0])]).add_to(edges)
             if not crossesStreet:
                 added_edges += 1
                 aparmentGroupGraph.add_edge(index, otherIndex)
@@ -108,13 +125,12 @@ for index, center1 in apartmentGroupCenters:
 groupExpansionComponents = nx.connected_components(aparmentGroupGraph)
 
 apartmentRegions = []
-for component in groupExpansionComponents:
-    apartmentGroupsForRegion = [apartmentGroups[index] for index in component]
+for indexes in groupExpansionComponents:
+    # TODO: save as extra class BuildingRegion)
+    apartmentGroupsForRegion = [apartmentGroups[index] for index in indexes]
     apartmentGroupForRegionGeometries = [geom for (indexes, geom) in apartmentGroupsForRegion] 
     apartmentRegion = unary_union(apartmentGroupForRegionGeometries).convex_hull
-    homeIndexesForRegion = []
-    [homeIndexesForRegion.extend(indexes) for (indexes, geom) in apartmentGroupsForRegion]
-    apartmentRegions.append((homeIndexesForRegion, apartmentRegion))
+    apartmentRegions.append((list(indexes), apartmentRegion))
 
 print("ApartmentRegions: {}".format(len(apartmentRegions)))
 
@@ -122,20 +138,24 @@ print("ApartmentRegions: {}".format(len(apartmentRegions)))
 
 geoJsonApartmentGroups = []
 for (indexes, shape) in apartmentGroups:
-    # TODO: properly analyse properties (propably only addresses and names, buildinglvls?)
-    streets = [allHomes[index]["properties"].get("addresses", None) for index in indexes]
-    feature = shapeGeomToGeoJson(shape, properties={"streets": streets})
+    # TODO: also add buildingIds
+    addressDics = [allHomes["features"][index]["properties"].get("addresses", None) for index in indexes]
+    addresses = unionAddresses(addressDics)
+    feature = shapeGeomToGeoJson(shape, properties={"addresses": addresses})
     geoJsonApartmentGroups.append(feature)
 geoJsonApartmentGroups = geojson.FeatureCollection(geoJsonApartmentGroups)
 
 geoJsonApartmentRegions = []
 for (indexes, shape) in apartmentRegions:
-    # TODO: properly analyse properties (propably only addresses and names?)
-    streets = [allHomes[index]["properties"].get("addresses", None) for index in indexes]
-    feature = shapeGeomToGeoJson(shape, properties={"streets": streets})
+    # TODO: also add apartmentComplexids?
+    addressDics = [geoJsonApartmentGroups["features"][index]["properties"].get("addresses", None) for index in indexes]
+    addresses = unionAddresses(addressDics)
+    feature = shapeGeomToGeoJson(shape, properties={"addresses": addresses})
     geoJsonApartmentRegions.append(feature)
 geoJsonApartmentRegions = geojson.FeatureCollection(geoJsonApartmentRegions)
 
+
+print("save complexes and regions")
 
 with open("out/data/apartmentGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(geoJsonApartmentGroups, outfile)
@@ -151,7 +171,8 @@ pieschenCoord = pieschen.toJSON()[0]
 map = folium.Map(
     location=[51.088534,13.723315], tiles='Open Street Map', zoom_start=15)
 
-edges.add_to(map)
+if visualize_edges:
+    edges.add_to(map)
 
 geoFeatureCollectionToFoliumFeatureGroup(allHomes, "black", name="Single apartments").add_to(map)
 

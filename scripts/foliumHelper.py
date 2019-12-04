@@ -37,6 +37,8 @@ def escapePropertyValue(value):
         return value.replace("`", "\`")
     if isinstance(value, list):
         return [escapePropertyValue(v) for v in value]
+    if isinstance(value, dict):
+        return "<br>".join(["&nbsp;&nbsp; {}: {}".format(k,v) for k, v in value.items()])
     else:
         return value
 
