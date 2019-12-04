@@ -8,25 +8,19 @@ POSTAL_CODES_PIESCHEN = ['01127', '01139']
 # Nomantin could not provide exact locations although openstreetmap had them (but only as a node?)
 # arcgis could only project near street (but best I could find)
 # bing could only find f.i. 5A and '5 A' was reduced to '5' (could be solved by removing spaces ?)
-def localizeAdress(addr: str):
-    location = geocoder.arcgis(addr).json
+def localizeAdress(street: str, postalCode: str, area: str):
+    """using a geocoder (mapping the address onto a street map) ... mapping onto buildings will be tried in another script"""
+    address = "{}, {} {}".format(street, postalCode, area)
+    location = geocoder.arcgis(address).json
     if location['ok']:
         coord = geojson.Point(coordinates=[location["lat"], location["lng"]])
     else:
         coord = None
     return coord
 
-# TODO: use overpass query based on given area (using address: tag)
-def localizeBasedOnArea(addr: str):
-    # area would be pieschen or dresden for now
-    # TODO: adjust scraper to return city, housenumber, street, postcode instead of whole address
-    # Problem: some buildings are only saved as ways (not single node) --> would need to take center of this?
-    return
-
-# based on a panda row from df.iterrow() (whatever type that has)
-def companyToGeoJson(companyRow):
-    address = "{}, {} {}".format(companyRow["street"], companyRow["postalCode"], companyRow["area"])
-    coord = localizeAdress(address)
+def companyToGeoJson(companyRow, localize):
+    """based on a panda row from df.iterrow()"""
+    coord = localizeAdress(companyRow["street"], companyRow["postalCode"], companyRow["area"])
     if coord:
         if isinstance(companyRow["branch"], str) and companyRow["branch"]:
             branches = list(set(companyRow["branch"].split(';')))
@@ -42,7 +36,7 @@ def companyToGeoJson(companyRow):
         return geojson.Feature(geometry=coord, properties=properties)
     else:
         return None
-
+ 
 def localizeCompanies(filePath: str):
     file = open(filePath + ".csv", encoding="utf-8") 
     companiesDf = pandas.read_csv(file, delimiter=',', dtype={'postalCode': str, 'branch':str})
@@ -68,7 +62,8 @@ def localizeCompanies(filePath: str):
     outFile = open(filePath + "_pieschen_localised.json", 'w', newline='', encoding="utf-8")
     geojson.dump(companies, outFile, ensure_ascii=False)
     file.close
-    outFile.close
 
 #localizeCompanies("scripts\scraper\companiesScraper\yellowPages_Dresden")
 localizeCompanies("scripts\scraper\companiesScraper\handelsregister_Dresden")
+
+#localizeBasedOnArea("Am Fluegelweg 3")

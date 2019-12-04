@@ -19,14 +19,13 @@ class Localizer():
         osmObjects = Overpass().query(query).toJSON()["elements"]
         for element in osmObjects:
             element["tags"] = {key: value for (key, value) in element["tags"].items() if key.startswith("addr:")}
-        # TODO: use R-tree for location based search?
-        # TODO: use nodes in osmObjects as property ? (directly filter on them?)
+        # TODO: Performance: use R-tree for location based search?
         self.locations = osmObjectsToGeoJSON(osmObjects)["features"]
-        # geometry in shapely form
+        # !!! geometry in shapely form
         for loc in self.locations:  
             loc["geometry"] = shape(loc["geometry"])
 
-    # TODO: init based on regions as geojson
+    # TODO: init based on regions as geojson to annotate objects inside region (possible extraClass)
 
     def locateAddress(self, street, postalCode, housenumber = None):
         """f.i. for geocoding companies onto buildings instead of streets"""
@@ -35,8 +34,11 @@ class Localizer():
         street = street.replace("str.", "straße").replace("Str.","Straße")
         if not housenumber:
             match = re.match(r"[^0-9]*(\d.*)", street)
-            street, housenumber = match.group(0), match.group(1)
-            street = street.rstrip()
+            if match:
+                street, housenumber = match.group(0), match.group(1)
+                street = street.rstrip()
+            else:
+                raise ValueError("Could not find housenumber in {}".format(street))
             # lowercase 3A to 3a and remove whitespaces between in housenumbers
             housenumber = housenumber.lower().strip()
         for location in self.locations:
