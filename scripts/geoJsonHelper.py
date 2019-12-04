@@ -1,15 +1,20 @@
 import geojson
 from shapely.geometry import mapping
 
-def osmObjectsToGeoJSON(osmObject):
+def osmObjectsToGeoJSON(osmObjects):
     """given a list osm-objects as json (! in geom out-format!)"""
     features = []
-    for object in osmObject:
+    for object in osmObjects:
         geometry = osmToGeoJsonGeometry(object)
+        properties = object["tags"]
+        if object["type"] == "way":
+            properties["__nodeIds"] = object["nodes"]
+        elif object["type"] == "node":
+            properties["__nodeId"] = object["id"]
         feature = geojson.Feature(
-            id=object["id"], geometry=geometry, properties=object["tags"])
+            id=object["id"], geometry=geometry, properties=properties)
         features.append(feature)
-    result = geojson.FeatureCollection(features)
+    result = geojson.FeatureCollection(features, validate=True)
     for error in result.errors():
         raise ValueError(
             "Error converting osm object to geojson: {}".format(error))
