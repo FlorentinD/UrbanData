@@ -26,8 +26,16 @@ def osmToGeoJsonGeometry(object):
     if points is None:
         raise ValueError('osm object has no geometry key {}'.format(object))
     if len(points) > 1:
-          # TODO: polygon for f.i. landuse
-        return geojson.LineString(points, validate=True)
+        polygonKeys = ["building", "landuse", "area"]
+        if(set(object["tags"].keys()).intersection(polygonKeys)):
+            polygon = geojson.Polygon([points])
+            if polygon.errors():
+                print("Could not convert to a polygon {}".format(object))
+                return geojson.LineString(points, validate=True)
+            else:
+                return polygon
+        else:
+            return geojson.LineString(points, validate=True)
     else:
         assert(len(points) == 1)
         return geojson.Point(points[0], validate=True)
