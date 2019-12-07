@@ -1,10 +1,13 @@
 from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
-from geoJsonHelper import  osmObjectsToGeoJSON
-import matplotlib.pyplot as plt
 import geopandas
+
+import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sb
+
+import sys
+sys.path.insert(0, './helper')
+from geoJsonConverter import  osmObjectsToGeoJSON
 
 areaName = "pieschen"
 # area to query

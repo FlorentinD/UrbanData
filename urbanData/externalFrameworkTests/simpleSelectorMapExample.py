@@ -1,11 +1,14 @@
 import json
-import folium
-from matplotlib import cm
-from geoJsonHelper import groupBy
-from foliumHelper import generateFeatureCollection, styleFunction, cmMapColorToHex
 from OSMPythonTools.nominatim import Nominatim
+import folium
 from folium.plugins.measure_control import MeasureControl
-from overpassHelper import OverPassHelper
+from matplotlib import cm
+
+import sys
+sys.path.insert(0, './helper')
+from geoJsonHelper import groupBy
+from geoJsonToFolium import generateFeatureCollection, styleFunction, cmMapColorToHex
+from overPassHelper import OverPassHelper
 
 # postfix for f.i. file_names
 areaName = "pieschen" 
@@ -32,6 +35,6 @@ for i, osmQuery in enumerate(osmDataFiles):
 
 folium.LayerControl().add_to(map)
 
-fileName = "out/map_{}.html".format(areaName)
+fileName = "out/maps/map_{}.html".format(areaName)
 map.save(fileName)
 print("Map saved in {}".format(fileName))

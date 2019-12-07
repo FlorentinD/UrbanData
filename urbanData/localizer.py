@@ -1,11 +1,15 @@
-from OSMPythonTools.nominatim import Nominatim
-from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
-from OsmObjectType import OsmObjectType
-from geoJsonHelper import osmObjectsToGeoJSON
-from shapely.geometry import mapping, shape
 from collections import defaultdict
 import re
+from OSMPythonTools.nominatim import Nominatim
+from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
+from shapely.geometry import mapping, shape
 
+import sys
+sys.path.insert(0, './helper')
+from geoJsonConverter import osmObjectsToGeoJSON
+from OsmObjectType import OsmObjectType
+
+# TODO: rewrite into annotater (AddressAnnotator, CompanyAnnotator)
 class Localizer():
     locations = None
     DEFAULT_POSTALCODE = "-1"
@@ -29,18 +33,17 @@ class Localizer():
 
     def locateAddress(self, street, postalCode, housenumber = None):
         """f.i. for geocoding companies onto buildings instead of streets"""
-        # TODO: normalize inputs
-        # replace "str." with "straße"
         street = street.replace("str.", "straße").replace("Str.","Straße")
         if not housenumber:
             match = re.match(r"[^0-9]*(\d.*)", street)
             if match:
+                # TODO: also handle 8a-10e and 9/10 and 9,10
                 street, housenumber = match.group(0), match.group(1)
                 street = street.rstrip()
+                # lowercase 3A to 3a and remove whitespaces between in housenumbers
+                housenumber = housenumber.lower().strip()
             else:
-                raise ValueError("Could not find housenumber in {}".format(street))
-            # lowercase 3A to 3a and remove whitespaces between in housenumbers
-            housenumber = housenumber.lower().strip()
+                raise ValueError("Could not find housenumber in {}".format(street)) 
         for location in self.locations:
             locationStreet = location["properties"].get("addr:street", None)
             locationHousenumber = location["properties"].get("addr:housenumber", None)

@@ -1,12 +1,12 @@
-# from https://github.com/mocnik-science/osm-python-tools (adapted example 3)
-from OSMPythonTools.nominatim import Nominatim
-from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
-from pathlib import Path
-from geoJsonHelper import osmObjectsToGeoJSON
-import geojson
 from typing import Dict, List
-from OsmDataQuery import OsmDataQuery
+from pathlib import Path
+import geojson
+from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
+from OSMPythonTools.nominatim import Nominatim
+
 from OsmObjectType import OsmObjectType as OsmType
+from OsmDataQuery import OsmDataQuery
+from geoJsonConverter import osmObjectsToGeoJSON
 
 
 class OverPassHelper:

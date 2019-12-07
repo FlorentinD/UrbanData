@@ -3,6 +3,8 @@ import geojson
 import geocoder
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
 
+### OUTDATED script ... (addressAnnotater will map companies to buildings based on address)
+
 POSTAL_CODES_PIESCHEN = ['01127', '01139']
 
 # Nomantin could not provide exact locations although openstreetmap had them (but only as a node?)
@@ -18,7 +20,7 @@ def localizeAdress(street: str, postalCode: str, area: str):
         coord = None
     return coord
 
-def companyToGeoJson(companyRow, localize):
+def companyToGeoJson(companyRow):
     """based on a panda row from df.iterrow()"""
     coord = localizeAdress(companyRow["street"], companyRow["postalCode"], companyRow["area"])
     if coord:

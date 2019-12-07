@@ -1,12 +1,12 @@
 import json
 import folium
+from folium.plugins.measure_control import MeasureControl
+import re
 import matplotlib
+
 from geoJsonHelper import groupBy, getSchema
 from OsmDataQuery import OsmDataQuery
 from OsmObjectType import OsmObjectType
-from OSMPythonTools.nominatim import Nominatim
-from folium.plugins.measure_control import MeasureControl
-import re
 
 
 def cmMapColorToHex(color):
@@ -51,7 +51,7 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
     for feature in geoFeatureCollection["features"]:
             geom = feature["geometry"]
             # ` was not allowed in Leatleaf JS 
-            describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items() if v])
+            describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items() if not k.startswith("__") and v])
             if geom["type"] == "Point":
                 loc = geom["coordinates"]
                 if switchLatAndLong:

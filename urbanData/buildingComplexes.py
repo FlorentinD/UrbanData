@@ -1,19 +1,24 @@
+from collections import defaultdict
 import matplotlib.pyplot as plt
 import json
 import geojson
 import folium
+import networkx as nx
 from shapely.geometry import Polygon, LineString, mapping, shape
 from shapely.ops import unary_union
 from geopy.distance import distance
-import networkx as nx
 from OSMPythonTools.nominatim import Nominatim
-from overpassHelper import OverPassHelper
+
+import sys
+sys.path.insert(0, './helper')
+from overPassHelper import OverPassHelper
 from OsmDataQuery import OsmDataQuery
 from OsmObjectType import OsmObjectType
-from foliumHelper import geoFeatureCollectionToFoliumFeatureGroup
-from geoJsonHelper import shapeGeomToGeoJson, unionFeatureCollections
+from geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup
+from geoJsonConverter import shapeGeomToGeoJson
+from geoJsonHelper import unionFeatureCollections
+
 from localizer import Localizer
-from collections import defaultdict
 
 # TODO: also use "flurstuecke" from openDataDresden ?
 
@@ -187,6 +192,6 @@ buildingRegionsFeature.add_to(map)
 
 folium.LayerControl().add_to(map)
 
-fileName = "out/buildingComplexes_{}.html".format(areaName)
+fileName = "out/maps/buildingComplexes_{}.html".format(areaName)
 map.save(fileName)
 print("Map saved in {}".format(fileName))
