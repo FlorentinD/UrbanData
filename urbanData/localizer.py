@@ -61,7 +61,7 @@ class Localizer():
             street = building["properties"].get("addr:street", self.DEFAULT_STREET)
             houseNumber = building["properties"].get("addr:housenumber", self.DEFAULT_HOUSENUMBER)
             key = self.__generateStreetsKey(postalCode, street)
-            addresses = {key: houseNumber}
+            addresses = {key: [houseNumber]}
         else:
             if(building["properties"]["__nodeIds"]):
                 addresses = self.addressesBasedOnOsmIds(buildingGeometry, building["properties"]["__nodeIds"])
