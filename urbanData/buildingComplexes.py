@@ -116,6 +116,7 @@ for index, center1 in apartmentGroupCenters:
     aparmentGroupGraph.add_node(index)
     
     for otherIndex, center2 in apartmentGroupCenters[index+1:]:
+        # TODO: Performance ? use shapely STRTree for querying this (need to set index attr in geometry for this! https://github.com/Toblerity/Shapely/issues/618)
         # more than 120 meters inbetween -> very likely something in between
         if distance(center1, center2).meters < 120:
             connection = LineString(coordinates=[center1, center2])
@@ -131,10 +132,11 @@ groupExpansionComponents = nx.connected_components(aparmentGroupGraph)
 
 apartmentRegions = []
 for indexes in groupExpansionComponents:
-    # TODO: save as extra class BuildingRegion)
+    # TODO: save as extra class BuildingRegion
     apartmentGroupsForRegion = [apartmentGroups[index] for index in indexes]
     apartmentGroupForRegionGeometries = [geom for (indexes, geom) in apartmentGroupsForRegion] 
     apartmentRegion = unary_union(apartmentGroupForRegionGeometries).convex_hull
+    # TODO: find streets crossing this regions (for refining geometry)
     apartmentRegions.append((list(indexes), apartmentRegion))
 
 print("ApartmentRegions: {}".format(len(apartmentRegions)))
