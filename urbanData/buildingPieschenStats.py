@@ -5,9 +5,7 @@ import geopandas
 import matplotlib.pyplot as plt
 import pandas as pd
 
-import sys
-sys.path.insert(0, './helper')
-from geoJsonConverter import  osmObjectsToGeoJSON
+from helper.geoJsonConverter import  osmObjectsToGeoJSON
 
 areaName = "pieschen"
 # area to query

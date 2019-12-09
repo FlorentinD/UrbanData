@@ -4,11 +4,11 @@ import folium
 from folium.plugins.measure_control import MeasureControl
 from matplotlib import cm
 
-import sys
-sys.path.insert(0, './helper')
-from geoJsonHelper import groupBy
-from geoJsonToFolium import generateFeatureCollection, styleFunction, cmMapColorToHex
-from overPassHelper import OverPassHelper
+import sys, os
+sys.path.insert(1, os.path.abspath('..'))
+from helper.geoJsonHelper import groupBy
+from helper.geoJsonToFolium import generateFeatureCollection, styleFunction, cmMapColorToHex
+from helper.overPassHelper import OverPassHelper
 
 # postfix for f.i. file_names
 areaName = "pieschen" 

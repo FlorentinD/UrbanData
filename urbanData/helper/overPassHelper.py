@@ -4,9 +4,9 @@ import geojson
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
 from OSMPythonTools.nominatim import Nominatim
 
-from OsmObjectType import OsmObjectType as OsmType
-from OsmDataQuery import OsmDataQuery
-from geoJsonConverter import osmObjectsToGeoJSON
+from helper.OsmObjectType import OsmObjectType as OsmType
+from helper.OsmDataQuery import OsmDataQuery
+from helper.geoJsonConverter import osmObjectsToGeoJSON
 
 
 class OverPassHelper:

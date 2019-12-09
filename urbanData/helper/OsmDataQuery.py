@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from OsmObjectType import OsmObjectType
+from helper.OsmObjectType import OsmObjectType
 from typing import List
 
 @dataclass

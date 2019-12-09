@@ -9,14 +9,12 @@ from shapely.ops import unary_union
 from geopy.distance import distance
 from OSMPythonTools.nominatim import Nominatim
 
-import sys
-sys.path.insert(0, './helper')
-from overPassHelper import OverPassHelper
-from OsmDataQuery import OsmDataQuery
-from OsmObjectType import OsmObjectType
-from geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup
-from geoJsonConverter import shapeGeomToGeoJson
-from geoJsonHelper import unionFeatureCollections
+from helper.overPassHelper import OverPassHelper
+from helper.OsmDataQuery import OsmDataQuery
+from helper.OsmObjectType import OsmObjectType
+from helper.geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup
+from helper.geoJsonConverter import shapeGeomToGeoJson
+from helper.geoJsonHelper import unionFeatureCollections
 
 from localizer import Localizer
 

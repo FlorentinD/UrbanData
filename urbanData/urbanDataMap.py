@@ -4,13 +4,11 @@ from matplotlib import cm
 from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
 
-import sys
-sys.path.insert(0, './helper')
-from geoJsonHelper import groupBy
-from geoJsonToFolium import generateFeatureCollection
-from overPassHelper import OverPassHelper
-from OsmObjectType import OsmObjectType as OsmObject
-from OsmDataQuery import OsmDataQuery
+from helper.geoJsonHelper import groupBy
+from helper.geoJsonToFolium import generateFeatureCollection
+from helper.overPassHelper import OverPassHelper
+from helper.OsmObjectType import OsmObjectType as OsmObject
+from helper.OsmDataQuery import OsmDataQuery
 
 # TODO: groupby on either amenity or building? (overlapping) (layers based on multiple tags not on single tag)
 # TODO: layers Safety, Health, Leisure, Commercial (shops, craft, building manaufture, ...), Religion,

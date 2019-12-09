@@ -1,9 +1,7 @@
 import unittest
 
-import sys
-import os
-
-sys.path.insert(0, os.path.abspath('../..'))
+import sys, os
+sys.path.insert(1, os.path.abspath('..'))
 from annotater.annotator import Annotator
 
 class TestBaseAnnotator(unittest.TestCase):

@@ -4,10 +4,8 @@ from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
 from shapely.geometry import mapping, shape
 
-import sys
-sys.path.insert(0, './helper')
-from geoJsonConverter import osmObjectsToGeoJSON
-from OsmObjectType import OsmObjectType
+from helper.geoJsonConverter import osmObjectsToGeoJSON
+from helper.OsmObjectType import OsmObjectType
 
 # TODO: rewrite into annotater (AddressAnnotator, CompanyAnnotator)
 class Localizer():

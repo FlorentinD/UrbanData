@@ -2,9 +2,9 @@ import geopandas
 import matplotlib.pyplot as plt
 from OSMPythonTools.nominatim import Nominatim
 
-import sys
-sys.path.insert(0, './helper')
-from overPassHelper import OverPassHelper
+import sys, os
+sys.path.insert(0, os.path.abspath('..'))
+from helper.overPassHelper import OverPassHelper
 
 plt.rcParams["figure.figsize"] = (25,25)
 

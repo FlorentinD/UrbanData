@@ -4,9 +4,9 @@ from folium.plugins.measure_control import MeasureControl
 import re
 import matplotlib
 
-from geoJsonHelper import groupBy, getSchema
-from OsmDataQuery import OsmDataQuery
-from OsmObjectType import OsmObjectType
+from helper.geoJsonHelper import groupBy, getSchema
+from helper.OsmDataQuery import OsmDataQuery
+from helper.OsmObjectType import OsmObjectType
 
 
 def cmMapColorToHex(color):

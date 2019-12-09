@@ -3,12 +3,12 @@ from OSMPythonTools.nominatim import Nominatim
 import folium
 from folium.plugins.measure_control import MeasureControl
 
-import sys
-sys.path.insert(0, './helper')
-from geoJsonHelper import groupBy
-from overPassHelper import OverPassHelper
-from OsmDataQuery import OsmDataQuery
-from OsmObjectType import OsmObjectType
+import sys, os
+sys.path.insert(1, os.path.abspath('..'))
+from helper.geoJsonHelper import groupBy
+from helper.overPassHelper import OverPassHelper
+from helper.OsmDataQuery import OsmDataQuery
+from helper.OsmObjectType import OsmObjectType
 
 pieschen = Nominatim().query('Pieschen, Dresden, Germany')
 
