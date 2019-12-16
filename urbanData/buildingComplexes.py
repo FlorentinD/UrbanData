@@ -16,12 +16,13 @@ from helper.geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup
 from helper.geoJsonConverter import shapeGeomToGeoJson
 from helper.geoJsonHelper import unionFeatureCollections
 
-from localizer import Localizer
+from annotater.osmAnnotater import AddressAnnotator, BuildingLvlAnnotator
+from annotater.companyAnnotator import CompanyAnnotator
 
 # TODO: also use "flurstuecke" from openDataDresden ?
 
 # TODO: take all buildings for regions and per region count number of living apartment, companies, ... (for showing percentage)
-# TODO: Use geopandas ? or look for other ways to increase performance
+# cannot use geopandas as pandas does not support list and dictonary datatypes)
 
 def analyseProperties(properties):
     # ! annotate each bulding with region id and then map afterwards again ... (takes to long in one run -> harder to test)
@@ -35,163 +36,162 @@ def analyseProperties(properties):
     # can be used later to aggregate towards regions
     return 0
 
-def unionAddresses(dics):
-    union = defaultdict(list)
-    for dic in dics:
-        for key, value in dic.items():
-            if not value == Localizer.DEFAULT_HOUSENUMBER:
-                union[key].extend(value)
-    return dict(union)
+def buildGroups(buildings):
+    """groups buildings together, with at least one common point returns a geo-json featurecollections
+        buildings: geojson featureCollection"""
 
-homesSelector = ['building~"apartments|terrace|house"', 'abandoned!~"yes"']
-homesQuery = OsmDataQuery("homes", OsmObjectType.WAY, homesSelector)
+    allBuildingsShapeGeom = list(enumerate([shape(building["geometry"]) for building in buildings["features"]]))
+    objectGraph = nx.Graph()
+    for index, shape1 in allBuildingsShapeGeom:
+        objectGraph.add_node(index)
+        # as touches is symmetric looking at elements after current one is enough
+        for otherIndex, shape2 in allBuildingsShapeGeom[index+1:]: 
+            if shape1.touches(shape2):
+                objectGraph.add_edge(index, otherIndex)
+   
+    buildingComponents = nx.connected_components(objectGraph)
+
+    # building geojson features
+    buildingGroups = []
+    for id, indexes in enumerate(buildingComponents):
+        buildings = [allBuildingsShapeGeom[index][1] for index in indexes]
+        buildingAddresses = [allHomes["features"][index]["properties"].get("addresses", None) for index in indexes]
+        groupAddresses = AddressAnnotator.unionAddresses(buildingAddresses)
+        groupShape = unary_union(buildings)
+        buildingIds = list(indexes)
+        buildingGroup = shapeGeomToGeoJson(groupShape, properties={"addresses": groupAddresses, "groupId": id, "__buildings": buildingIds })
+        buildingGroups.append(buildingGroup)
+
+    print("BuildingGroups: {}".format(len(buildingGroups)))
+
+    return geojson.FeatureCollection(buildingGroups)
 
 
-# later in group look for homes -> living area ; companies -> company area ; abandoned -> unused area?; .... 
-allBuildingsQuery = OsmDataQuery("homes", OsmObjectType.WAY, ['"building"', 'abandoned!~"yes"'])
+def buildRegions(buildingGroups, borders):
+    """buildingGroup expansion (if no borders inbetween -> union)"""
 
-pieschen = Nominatim().query('Pieschen, Dresden, Germany')
-osmQueries = [ homesQuery,
+    # center coordinates for each buildingGroup
+    # TODO: if group is To large ... use multiple points ?!
+    buildingGroupCenters = list(enumerate([shape(building["geometry"]).centroid.coords[0] for building in buildingGroups["features"]]))
+    # borders between building-groups
+    bordersShapelyLines = [shape(street["geometry"]) for street in borders["features"]] 
+
+    buildingGroupGraph = nx.Graph()
+    #visualize_edges = True
+    #if visualize_edges:
+    #    edges = folium.FeatureGroup("edges between home-groups")
+
+    added_edges = 0
+
+    for index, center1 in buildingGroupCenters:
+        if(index % 50 == 0):
+            print("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupCenters), added_edges))
+            added_edges = 0
+        buildingGroupGraph.add_node(index)
+    
+        for otherIndex, center2 in buildingGroupCenters[index+1:]:
+            # TODO: Performance ? use shapely STRTree for querying this (need to set index attr in geometry for this! https://github.com/Toblerity/Shapely/issues/618)
+            # more than 120 meters inbetween -> very likely something in between
+            if distance(center1, center2).meters < 120:
+                connection = LineString(coordinates=[center1, center2])
+                crossesStreet = True in [street.crosses(connection) for street in bordersShapelyLines]
+                #if VISUALIZE_EDGES:
+                #    folium.vector_layers.PolyLine([(center1[1], center1[0]), (center2[1], center2[0])]).add_to(edges)
+                if not crossesStreet:
+                    added_edges += 1
+                    buildingGroupGraph.add_edge(index, otherIndex)
+                else:
+                    "filler"
+                    #TODO: save street as border of group (then propagate to region)
+
+    regionComponents = nx.connected_components(buildingGroupGraph)
+
+    buildingRegions = []
+    for id, indexes in enumerate(regionComponents):
+        groupsForRegion = [buildingGroups["features"][index] for index in indexes]
+        groupForRegionGeometries = [shape(group["geometry"]) for group in groupsForRegion] 
+        # TODO: use saved streets for this regions (for refining geometry) (find method for refinement)
+        regionShape = unary_union(groupForRegionGeometries).convex_hull
+
+        groupAddresses = [buildingGroups["features"][index]["properties"].get("addresses", None) for index in indexes]
+        regionAddresses = AddressAnnotator.unionAddresses(groupAddresses)
+        groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
+        region = shapeGeomToGeoJson(regionShape, properties={"addresses": regionAddresses, "regionId": id, "buildingGroups": groupIds})
+        buildingRegions.append(region)
+
+    print("ApartmentRegions: {}".format(len(buildingRegions)))
+    return geojson.FeatureCollection(buildingRegions)
+
+
+if __name__ == "__main__":
+    homesSelector = ['building~"apartments|terrace|house"', 'abandoned!~"yes"']
+    homesQuery = OsmDataQuery("homes", OsmObjectType.WAY, homesSelector)
+
+
+    # later in group look for homes -> living area ; companies -> company area ; abandoned -> unused area?; .... 
+    allBuildingsQuery = OsmDataQuery("homes", OsmObjectType.WAY, ['"building"', 'abandoned!~"yes"'])
+
+    pieschen = Nominatim().query('Pieschen, Dresden, Germany')
+    osmQueries = [ homesQuery,
             OsmDataQuery("borders", OsmObjectType.WAY,  
             ['highway~"primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|motorway|unclassified"']),
             OsmDataQuery("borders_railway", OsmObjectType.WAY, ["'railway'~'rail'"])]
 
-osmData = OverPassHelper().directFetch(pieschen.areaId(), osmQueries)
+    # https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL#By_polygon_.28poly.29 for filtering based on polygon (if borough based on openDataDresden)
+    osmData = OverPassHelper().directFetch(pieschen.areaId(), osmQueries)
 
-allHomes = next(osmData)
+    allHomes = next(osmData)
 
-# Poor Mans Testing
-# allHomes = geojson.FeatureCollection(allHomes["features"][:50])
+    # Poor Mans Testing
+    allHomes = geojson.FeatureCollection(allHomes["features"][800:1200])
 
-localizer = Localizer('Pieschen, Dresden, Germany')
-# TODO check if not already annotaded file exists 
-[localizer.annotateWithAddresses(home) for home in allHomes["features"]]
+    addressAnnotator = AddressAnnotator('Pieschen, Dresden, Germany')
 
-print("Annotated {} buildings with addresses".format(len(allHomes["features"])))
+    companyAnnotator = CompanyAnnotator()
+    annotater = [addressAnnotator, BuildingLvlAnnotator(), companyAnnotator]
 
-allApartmentsShapeGeom = list(enumerate([shape(apartment["geometry"]) for apartment in allHomes["features"]]))
-objectGraph = nx.Graph()
+    for annotator in annotater:
+        allHomes = annotator.annotateAll(allHomes)
 
-# TODO: only do this if specified (only useful if area contains many blocks)
-for index, shape1 in allApartmentsShapeGeom:
-    objectGraph.add_node(index)
-    # as intersection is symmetric looking at elements after current one is enough
-    for otherIndex, shape2 in allApartmentsShapeGeom[index+1:]: 
-        if shape1.touches(shape2):
-            objectGraph.add_edge(index, otherIndex)
-   
-apartmentComponents = nx.connected_components(objectGraph)
+    print("Annotated {} buildings".format(len(allHomes["features"])))
 
-apartmentGroups = []
-for indexes in apartmentComponents:
-    # [1] as first one is index created by enumerate
-    # TODO: also save buildingIds (extra class BuildingComplex)
-    apartments = [allApartmentsShapeGeom[index][1] for index in indexes]
-    # also save indexes to fetch && aggregate properties at the end 
-    apartmentComplex = (list(indexes), unary_union(apartments))
-    apartmentGroups.append(apartmentComplex)
+    groups = buildGroups(allHomes)
 
-print("ApartmentGroups: {}".format(len(apartmentGroups)))
-
-########## ApartmentGroups expansion (if no borders inbetween -> union)
-
-# borders between building-complexes
-borders = unionFeatureCollections(*list(osmData))
-bordersShapelyLines = [shape(street["geometry"]) for street in borders["features"]] 
-
-aparmentGroupGraph = nx.Graph()
-apartmentGroupCenters = list(enumerate([group.centroid.coords[0] for _, group in apartmentGroups]))
-
-added_edges = 0
-visualize_edges = True
-if visualize_edges:
-    edges = folium.FeatureGroup("edges between home-groups")
-
-for index, center1 in apartmentGroupCenters:
-    if(index % 50 == 0):
-        print("Progress: {}/{} ; {} edges added".format(index + 1, len(apartmentGroupCenters), added_edges))
-        added_edges = 0
-    aparmentGroupGraph.add_node(index)
+    borders = unionFeatureCollections(*list(osmData))
     
-    for otherIndex, center2 in apartmentGroupCenters[index+1:]:
-        # TODO: Performance ? use shapely STRTree for querying this (need to set index attr in geometry for this! https://github.com/Toblerity/Shapely/issues/618)
-        # more than 120 meters inbetween -> very likely something in between
-        if distance(center1, center2).meters < 120:
-            connection = LineString(coordinates=[center1, center2])
-            crossesStreet = True in [street.crosses(
-                connection) for street in bordersShapelyLines]
-            if visualize_edges:
-                folium.vector_layers.PolyLine([(center1[1], center1[0]), (center2[1], center2[0])]).add_to(edges)
-            if not crossesStreet:
-                added_edges += 1
-                aparmentGroupGraph.add_edge(index, otherIndex)
+    regions = buildRegions(groups, borders)
 
-groupExpansionComponents = nx.connected_components(aparmentGroupGraph)
+    print("save complexes and regions")
 
-apartmentRegions = []
-for indexes in groupExpansionComponents:
-    # TODO: save as extra class BuildingRegion
-    apartmentGroupsForRegion = [apartmentGroups[index] for index in indexes]
-    apartmentGroupForRegionGeometries = [geom for (indexes, geom) in apartmentGroupsForRegion] 
-    apartmentRegion = unary_union(apartmentGroupForRegionGeometries).convex_hull
-    # TODO: find streets crossing this regions (for refining geometry)
-    apartmentRegions.append((list(indexes), apartmentRegion))
-
-print("ApartmentRegions: {}".format(len(apartmentRegions)))
-
-# TODO: refactor into extra function
-
-geoJsonApartmentGroups = []
-for (indexes, shape) in apartmentGroups:
-    # TODO: also add buildingIds
-    addressDics = [allHomes["features"][index]["properties"].get("addresses", None) for index in indexes]
-    addresses = unionAddresses(addressDics)
-    feature = shapeGeomToGeoJson(shape, properties={"addresses": addresses})
-    geoJsonApartmentGroups.append(feature)
-geoJsonApartmentGroups = geojson.FeatureCollection(geoJsonApartmentGroups)
-
-geoJsonApartmentRegions = []
-for (indexes, shape) in apartmentRegions:
-    # TODO: also add apartmentComplexids?
-    addressDics = [geoJsonApartmentGroups["features"][index]["properties"].get("addresses", None) for index in indexes]
-    addresses = unionAddresses(addressDics)
-    feature = shapeGeomToGeoJson(shape, properties={"addresses": addresses})
-    geoJsonApartmentRegions.append(feature)
-geoJsonApartmentRegions = geojson.FeatureCollection(geoJsonApartmentRegions)
+    with open("out/data/apartmentGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
+            geojson.dump(groups, outfile)
+    with open("out/data/apartmentRegions_pieschen.json", 'w', encoding='UTF-8') as outfile:
+            geojson.dump(regions, outfile)
 
 
-print("save complexes and regions")
+    ######### Visual 
+    areaName = "pieschen"
+    pieschen = Nominatim().query('Pieschen, Dresden, Germany')
+    pieschenCoord = pieschen.toJSON()[0]
+    map = folium.Map(
+        location=[51.088534,13.723315], tiles='Open Street Map', zoom_start=15)
 
-with open("out/data/apartmentGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
-            geojson.dump(geoJsonApartmentGroups, outfile)
+    #if VISUALIZE_EDGES:
+    #    edges.add_to(map)
 
-with open("out/data/apartmentRegions_pieschen.json", 'w', encoding='UTF-8') as outfile:
-            geojson.dump(geoJsonApartmentRegions, outfile)
+    geoFeatureCollectionToFoliumFeatureGroup(allHomes, "black", name="Single apartments").add_to(map)
 
-######### Visual 
+    bordersFeature = geoFeatureCollectionToFoliumFeatureGroup(borders, "red", "borders")
+    bordersFeature.add_to(map)
 
-areaName = "pieschen"
-pieschen = Nominatim().query('Pieschen, Dresden, Germany')
-pieschenCoord = pieschen.toJSON()[0]
-map = folium.Map(
-    location=[51.088534,13.723315], tiles='Open Street Map', zoom_start=15)
+    buildingGroupsFeature = geoFeatureCollectionToFoliumFeatureGroup(groups, "blue", "apartment groups")
+    buildingGroupsFeature.add_to(map)
 
-if visualize_edges:
-    edges.add_to(map)
+    buildingRegionsFeature = geoFeatureCollectionToFoliumFeatureGroup(regions, "green", "apartment regions")
+    buildingRegionsFeature.add_to(map)
 
-geoFeatureCollectionToFoliumFeatureGroup(allHomes, "black", name="Single apartments").add_to(map)
+    folium.LayerControl().add_to(map)
 
-bordersFeature = geoFeatureCollectionToFoliumFeatureGroup(borders, "red", "borders")
-bordersFeature.add_to(map)
-
-buildingGroupsFeature = geoFeatureCollectionToFoliumFeatureGroup(geoJsonApartmentGroups, "blue", "apartment groups")
-buildingGroupsFeature.add_to(map)
-
-buildingRegionsFeature = geoFeatureCollectionToFoliumFeatureGroup(geoJsonApartmentRegions, "green", "apartment regions")
-buildingRegionsFeature.add_to(map)
-
-folium.LayerControl().add_to(map)
-
-fileName = "out/maps/buildingComplexes_{}.html".format(areaName)
-map.save(fileName)
-print("Map saved in {}".format(fileName))
+    fileName = "out/maps/buildingComplexes_{}.html".format(areaName)
+    map.save(fileName)
+    print("Map saved in {}".format(fileName))
