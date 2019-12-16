@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from geojson import FeatureCollection
 
 class Annotator():
     """Base Class for annotaters of geojson-objects
@@ -14,7 +15,11 @@ class Annotator():
         self.dataSource = dataSource
         self.writeProperty = writeProperty
 
+    def annotateAll(self, objects):
+        """annotates a geojson-featureCollection"""
+        annotatedFeatures = [self.annotate(object) for object in objects["features"]]
+        return FeatureCollection(annotatedFeatures)
+
     @abstractmethod
-    def annotate(self, objects, matchCondition):
-        # TODO: is a matchCondition reasonable?
-        pass
+    def annotate(self, object):
+       raise NotImplementedError
