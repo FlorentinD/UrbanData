@@ -1,4 +1,4 @@
-import sys, os
+import re
 from collections import defaultdict
 from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
@@ -32,7 +32,8 @@ class AddressAnnotator(OsmAnnotator):
     writeProperty = "addresses"
     osmSelector = ['"addr:street"', '"addr:housenumber"']
     
-    def __generateStreetsKey(self, postalCode, street):
+    @staticmethod
+    def generateAddressKey(postalCode, street):
         return "{}, {}".format(postalCode, street)
     
     def annotate(self, object):
@@ -43,7 +44,7 @@ class AddressAnnotator(OsmAnnotator):
             postalCode = object["properties"].get("addr:postcode", None)
             street = object["properties"].get("addr:street", None)
             houseNumber = object["properties"].get("addr:housenumber", None)
-            key = self.__generateStreetsKey(postalCode, street)
+            key = self.generateAddressKey(postalCode, street)
             addresses = {key: [houseNumber]}
         else:
             if(object["properties"]["__nodeIds"]):
@@ -56,7 +57,7 @@ class AddressAnnotator(OsmAnnotator):
                         postalCode = location["properties"].get("addr:postcode", None)
                         street = location["properties"].get("addr:street", None)
                         houseNumber = location["properties"].get("addr:housenumber", None)
-                        key = self.__generateStreetsKey(postalCode, street)
+                        key = self.generateAddressKey(postalCode, street)
                         addresses[key].append(houseNumber)
         # ! can still be empty (f.i. https://www.openstreetmap.org/way/35540321 or https://www.openstreetmap.org/way/32610207) could only be solved by taking nearest element with address 
         object["properties"][self.writeProperty] = addresses
@@ -69,7 +70,7 @@ class AddressAnnotator(OsmAnnotator):
             postalCode = location["properties"].get("addr:postcode", None)
             street = location["properties"].get("addr:street", None)
             houseNumber = location["properties"].get("addr:housenumber", None)
-            key = self.__generateStreetsKey(postalCode, street)
+            key = self.generateAddressKey(postalCode, street)
             addresses[key].append(houseNumber)
         return addresses
 
@@ -103,12 +104,53 @@ class BuildingLvlAnnotator(Annotator):
         object["properties"][self.writeProperty] = buildingLevels - buildingMinLevels + roofLevels
         return object
 
+    def aggregate(self, objects):
+        """aggregate to avg levels in group/region"""
+        raise NotImplementedError
+
 
 
 class BuildingTypeClassifier(Annotator):
     # depends on properties: "buildings", "companies"
     # f.i. living, education, ... 
-    # TODO
-    # could be list of types per building?
-    def __init__():
+
+    writeProperty = "type"
+
+    def __init__(self):
         pass
+
+    def annotate(self, object):
+        object[self.writeProperty] = self.classify(object)
+        return object
+
+    def classify(self, object):
+        types : set = set()
+        # TODO: extract types in enum with matching regexps
+        buildingType = object.get("building", None)
+        if object.get("abandoned", None) == "yes":
+            types.add("abandoned")
+        elif buildingType:
+            if re.match("yes", buildingType):
+                # TODO needed here?
+                 types.add("unclassified")
+            elif re.match("apartments|terrace|house|residental|dormitory", buildingType):
+                types.add("residential")
+            elif re.match("hospital|ambulance_station", buildingType):
+                types.add("health")
+            elif re.match("kindergarten|school|universitary", buildingType):
+                types.add("education")
+            elif re.match("industrial|manufacture|warehouse|greenhouse", buildingType):
+                types.add("industrial")
+            elif re.match("retail|shop|supermarket|service|commercial", buildingType):
+                types.add("commercial")
+            elif re.match("public|", buildingType):
+                types.add("public admin")
+            elif re.match("collapsed", buildingType):
+                types.add("abandoned")
+            elif re.match("church", buildingType):
+                types.add("holy")
+        # TODO: try to companies property
+        #TODO: leisure, shop, amenity , ... 
+        #       depends on companies/restaurants being already mapped onto building
+            # TODO: health, public, food/restaurant, commerce, education, safety, public admin, ... 
+        return list(types)
