@@ -2,16 +2,15 @@ from dataclasses import dataclass
 import re
 from geojson import FeatureCollection
 from csv import DictReader
-from logging import Logger
 
 from annotater.annotator import Annotator
+from annotater.osmAnnotater import AddressAnnotator
 
 class CompanyAnnotator(Annotator):
     """Annotates objects (probably buildings) with companies based on address information"""
 
     writeProperty = "companies"
     dataSource = []
-    logger = Logger("CompanAnnotator Logger")
 
     defaultDataSources = ["handelsregister_Dresden", "yellowPages_Dresden"]
 
@@ -23,7 +22,7 @@ class CompanyAnnotator(Annotator):
         if not companyData:
             # TODO:  !!! remove duplicates (if address alike and name very similar ?)
             for fileName in self.defaultDataSources:
-                with open("urbanData\scraper\companiesScraper\{}.csv".format(fileName), 'r',  encoding="utf-8") as file:
+                with open("scraper\companiesScraper\{}.csv".format(fileName), 'r',  encoding="utf-8") as file:
                     for row in DictReader(file, skipinitialspace=True):
                         companyDic = {k: v   for k,v in row.items()}
                         if companyDic["postalCode"] in postalCodes:
@@ -32,25 +31,72 @@ class CompanyAnnotator(Annotator):
                                 match = re.match(r"([^0-9]*)(\d.*)", companyDic["street"])
                                 if match:
                                     street, housenumber = match.group(1), match.group(2)
-                                    companyDic["street"] = street.replace("str.", "straße").replace("Str.","Straße")
+                                    companyDic["street"] = street.replace("str.", "straße").replace("Str.","Straße").strip()
                                     companyDic["houseNumber"] = self.extractHousenumber(housenumber)
                                     if not companyDic["houseNumber"]:
                                         # known Problems: street names containing numbers like 'Str. des 17. Juni 25/Geb. 102'
                                         #                 'OneStreet 35/OtherStreet 42'
                                         #                 'OneStreet 172 Eingang B' (could be shortened to 172B probably?)
-                                        self.logger.debug("could not parse houseNumber inside {} ".format(companyDic["street"]))
-                                    self.dataSource.append(companyDic)
+                                        self.logger.debug("{}: could not parse houseNumber inside {} ".format(__name__,companyDic["street"]))
+                                    else:
+                                        self.dataSource.append(companyDic)
                                 if not match:
-                                    self.logger.debug("{} does not contain a housenumber".format(companyDic))
+                                    self.logger.debug("{}: {} does not contain a housenumber".format(__name__,companyDic))
          
         else:
             self.dataSource = companyData
-        self.logger.info("Loaded {} companies".format(len(self.dataSource)))
+        self.logger.info("{}: Loaded {} companies with a well-formed address".format(__name__, len(self.dataSource)))
 
+
+    
     # TODO: move annotate method
+    def annotateAll(self, buildings):
+        """adds companies by matching addresses"""
+        # overwrites method, as 
+        # TODO: map companies to building: {name, branch, number of entrances (for relative area of building later on)}
+        # TODO: loop over buildings first? (would not need to overwrite annotateAll)
+        
+        # TODO: replace this nested loop join (extract join condition)
+        compainesAdded = 0
+        for company in self.dataSource:
+            companyHouseNumber =  company["houseNumber"]
+            addressKey = AddressAnnotator.generateAddressKey(company["postalCode"], company["street"]) 
+            findMatch = False
+            for building in buildings["features"]:
+                # TODO: look for values first and then check if key could match ?
+                addresses = building["properties"].get("addresses", None)
+                if addresses:
+                    houseNumbers = addresses.get(addressKey, None)
+                    if houseNumbers:
+                        entrances = 0
+                        if isinstance(companyHouseNumber, str):
+                            if companyHouseNumber in houseNumbers:
+                                entrances = 1
+                        elif isinstance(companyHouseNumber, list):
+                            overlappingNumbers = set(companyHouseNumber).intersection(houseNumbers)
+                            entrances = len(overlappingNumbers)
+                        elif isinstance(companyHouseNumber, HouseNumberRange):
+                            overlappingNumbers = [n for n in houseNumbers if companyHouseNumber.start <= n <= companyHouseNumber.end]
+                            entrances = len(overlappingNumbers)
+                        else:
+                            raise ValueError("Unexpected type for houseNumber {}".format(type(companyHouseNumber)))
+                        if entrances > 0:
+                            findMatch = True
+                            compainesAdded += 1
+                            companyEntry = (company["name"], company["branch"], entrances)
+                            if self.writeProperty in building.keys():
+                                building[self.writeProperty].append(companyEntry)
+                            else:
+                                building[self.writeProperty] = [companyEntry]
+            if not findMatch:
+                self.logger.debug("{}: Could not find building for {}".format(__name__, company))
+        # TODO: find out missing companies
+        self.logger.info("{}: Could add {} companies".format(__name__, compainesAdded))
+
+        return FeatureCollection(buildings)
+
     def annotate(self, building):
-        # TODO: map companies to building: {name, branch, number of entrances}
-        raise NotImplementedError
+        raise NotImplementedError("Each company is mapped to one or more buildings instead of building to company")
 
     @staticmethod
     def extractHousenumber(input):

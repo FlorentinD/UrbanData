@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from geojson import FeatureCollection
+import logging
 
 class Annotator():
     """Base Class for annotaters of geojson-objects
@@ -10,6 +11,7 @@ class Annotator():
     """Property added to the geojson object"""
     writeProperty = None
     dataSource = None
+    logger = logging.getLogger('')
 
     def __init__(self, dataSource, writeProperty):
         self.dataSource = dataSource
