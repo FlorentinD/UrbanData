@@ -1,5 +1,6 @@
 from collections import defaultdict
 import matplotlib.pyplot as plt
+import logging
 import json
 import geojson
 import folium
@@ -16,7 +17,7 @@ from helper.geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup
 from helper.geoJsonConverter import shapeGeomToGeoJson
 from helper.geoJsonHelper import unionFeatureCollections
 
-from annotater.osmAnnotater import AddressAnnotator, BuildingLvlAnnotator
+from annotater.osmAnnotater import AddressAnnotator, BuildingLvlAnnotator, BuildingTypeClassifier
 from annotater.companyAnnotator import CompanyAnnotator
 
 # TODO: also use "flurstuecke" from openDataDresden ?
@@ -24,21 +25,16 @@ from annotater.companyAnnotator import CompanyAnnotator
 # TODO: take all buildings for regions and per region count number of living apartment, companies, ... (for showing percentage)
 # cannot use geopandas as pandas does not support list and dictonary datatypes)
 
-def analyseProperties(properties):
-    # ! annotate each bulding with region id and then map afterwards again ... (takes to long in one run -> harder to test)
-    # TODO: function to map region id based for an object (based on address or just geometry)
-    # tag order to analyse: public, leisure, amenity, buldings, landuse, office ? ... check if company?
-    # apartments -> use building:levels and roof:levels for levels (assume 3-4 ?)
-    #   https://wiki.openstreetmap.org/wiki/Key:building:levels
-    # house : assume one level ? (if none given)
-    # terrace: sequence of houses -> count addresses contained (implicit number of entrances) (assume 1 lvl per house?)
-    """analyses properties of building in a building group"""
-    # can be used later to aggregate towards regions
-    return 0
+
+# TODO: function to map region id based for an object (based on address or just geometry)
+# tag order to analyse: public, leisure, amenity, buldings, landuse, office ? ... check if company?
+# house : assume one level ? (if none given)
+# terrace: sequence of houses -> count addresses contained (implicit number of entrances) (assume 1 lvl per house?)
 
 def buildGroups(buildings):
     """groups buildings together, with at least one common point returns a geo-json featurecollections
-        buildings: geojson featureCollection"""
+        buildings: geojson featureCollection
+        """
 
     allBuildingsShapeGeom = list(enumerate([shape(building["geometry"]) for building in buildings["features"]]))
     objectGraph = nx.Graph()
@@ -54,15 +50,17 @@ def buildGroups(buildings):
     # building geojson features
     buildingGroups = []
     for id, indexes in enumerate(buildingComponents):
-        buildings = [allBuildingsShapeGeom[index][1] for index in indexes]
-        buildingAddresses = [allHomes["features"][index]["properties"].get("addresses", None) for index in indexes]
-        groupAddresses = AddressAnnotator.unionAddresses(buildingAddresses)
-        groupShape = unary_union(buildings)
+        buildingGeometries = [allBuildingsShapeGeom[index][1] for index in indexes]
+        groupShape = unary_union(buildingGeometries)
         buildingIds = list(indexes)
+        # TODO: do later
+        buildingAddresses = [buildings["features"][index]["properties"].get("addresses", None) for index in indexes]
+        groupAddresses = AddressAnnotator.unionAddresses(buildingAddresses)
+
         buildingGroup = shapeGeomToGeoJson(groupShape, properties={"addresses": groupAddresses, "groupId": id, "__buildings": buildingIds })
         buildingGroups.append(buildingGroup)
 
-    print("BuildingGroups: {}".format(len(buildingGroups)))
+    logger.info("BuildingGroups: {}".format(len(buildingGroups)))
 
     return geojson.FeatureCollection(buildingGroups)
 
@@ -102,7 +100,8 @@ def buildRegions(buildingGroups, borders):
                     buildingGroupGraph.add_edge(index, otherIndex)
                 else:
                     "filler"
-                    #TODO: save street as border of group (then propagate to region)
+                    #TODO: street as border of group (then propagate to region)
+                    # TODO: save as node property via buildingGroupGraph.node[index]['borders'] 
 
     regionComponents = nx.connected_components(buildingGroupGraph)
 
@@ -112,27 +111,31 @@ def buildRegions(buildingGroups, borders):
         groupForRegionGeometries = [shape(group["geometry"]) for group in groupsForRegion] 
         # TODO: use saved streets for this regions (for refining geometry) (find method for refinement)
         regionShape = unary_union(groupForRegionGeometries).convex_hull
+        groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
 
+        # TODO: extract into later 
         groupAddresses = [buildingGroups["features"][index]["properties"].get("addresses", None) for index in indexes]
         regionAddresses = AddressAnnotator.unionAddresses(groupAddresses)
-        groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
+
         region = shapeGeomToGeoJson(regionShape, properties={"addresses": regionAddresses, "regionId": id, "buildingGroups": groupIds})
         buildingRegions.append(region)
 
-    print("ApartmentRegions: {}".format(len(buildingRegions)))
+    logger.info("ApartmentRegions: {}".format(len(buildingRegions)))
     return geojson.FeatureCollection(buildingRegions)
 
 
+logger = logging.getLogger('')
+logging.basicConfig(level=logging.INFO)
+
 if __name__ == "__main__":
-    homesSelector = ['building~"apartments|terrace|house"', 'abandoned!~"yes"']
-    homesQuery = OsmDataQuery("homes", OsmObjectType.WAY, homesSelector)
+    #homesSelector = ['building~"apartments|terrace|house"', 'abandoned!~"yes"']
+    #homesQuery = OsmDataQuery("homes", OsmObjectType.WAY, homesSelector)
 
 
-    # later in group look for homes -> living area ; companies -> company area ; abandoned -> unused area?; .... 
     allBuildingsQuery = OsmDataQuery("homes", OsmObjectType.WAY, ['"building"', 'abandoned!~"yes"'])
 
     pieschen = Nominatim().query('Pieschen, Dresden, Germany')
-    osmQueries = [ homesQuery,
+    osmQueries = [ allBuildingsQuery,
             OsmDataQuery("borders", OsmObjectType.WAY,  
             ['highway~"primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|motorway|unclassified"']),
             OsmDataQuery("borders_railway", OsmObjectType.WAY, ["'railway'~'rail'"])]
@@ -140,28 +143,33 @@ if __name__ == "__main__":
     # https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL#By_polygon_.28poly.29 for filtering based on polygon (if borough based on openDataDresden)
     osmData = OverPassHelper().directFetch(pieschen.areaId(), osmQueries)
 
-    allHomes = next(osmData)
+    buildings = next(osmData)
 
+    logger.info("Loaded {} buildings".format(len(buildings["features"])))
     # Poor Mans Testing
-    allHomes = geojson.FeatureCollection(allHomes["features"][800:1200])
+    buildings = geojson.FeatureCollection(buildings["features"])
 
     addressAnnotator = AddressAnnotator('Pieschen, Dresden, Germany')
 
-    companyAnnotator = CompanyAnnotator()
-    annotater = [addressAnnotator, BuildingLvlAnnotator(), companyAnnotator]
+    annotater = [addressAnnotator, BuildingLvlAnnotator(), CompanyAnnotator(), BuildingTypeClassifier()]
 
     for annotator in annotater:
-        allHomes = annotator.annotateAll(allHomes)
+        buildings = annotator.annotateAll(buildings)
 
-    print("Annotated {} buildings".format(len(allHomes["features"])))
+    logger.info("Annotated {} buildings".format(len(buildings["features"])))
 
-    groups = buildGroups(allHomes)
+    groups = buildGroups(buildings)
 
     borders = unionFeatureCollections(*list(osmData))
-    
+
+    # TODO: add landuse ways to regions (could be also seperate regions) f.i. police, forest, grass
+    #           allointments (kleingaerten) 
+    #           leisure like sports_centre, park
     regions = buildRegions(groups, borders)
 
-    print("save complexes and regions")
+    # TODO: pull apart property analysis and region building
+    #TODO: annotate with groups and regions with aggregated properties 
+    logger.info("save complexes and regions")
 
     with open("out/data/apartmentGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(groups, outfile)
@@ -179,7 +187,7 @@ if __name__ == "__main__":
     #if VISUALIZE_EDGES:
     #    edges.add_to(map)
 
-    geoFeatureCollectionToFoliumFeatureGroup(allHomes, "black", name="Single apartments").add_to(map)
+    geoFeatureCollectionToFoliumFeatureGroup(buildings, "black", name="Single apartments").add_to(map)
 
     bordersFeature = geoFeatureCollectionToFoliumFeatureGroup(borders, "red", "borders")
     bordersFeature.add_to(map)
@@ -194,4 +202,4 @@ if __name__ == "__main__":
 
     fileName = "out/maps/buildingComplexes_{}.html".format(areaName)
     map.save(fileName)
-    print("Map saved in {}".format(fileName))
+    logger.info("Map saved in {}".format(fileName))
