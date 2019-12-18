@@ -65,13 +65,17 @@ def buildGroups(buildings):
 def buildRegions(buildingGroups, borders):
     """buildingGroup expansion (if no borders inbetween -> union)"""
 
-    # center coordinates for each buildingGroup
     # TODO: if group is To large ... use multiple points ?!
+    # center coordinates for each buildingGroup
     buildingGroupCenters = list(enumerate([shape(building["geometry"]).centroid.coords[0] for building in buildingGroups["features"]]))
     # borders between building-groups
     bordersShapelyLines = [shape(street["geometry"]) for street in borders["features"]] 
 
     buildingGroupGraph = nx.Graph()
+    # init graph 
+    for index, _ in buildingGroupCenters:
+        buildingGroupGraph.add_node(index, borders = set())
+
     #visualize_edges = True
     #if visualize_edges:
     #    edges = folium.FeatureGroup("edges between home-groups")
@@ -79,28 +83,30 @@ def buildRegions(buildingGroups, borders):
     added_edges = 0
 
     for index, center1 in buildingGroupCenters:
-        if(index % 50 == 0):
+        if((index + 1) % 50 == 0 and not index == 0):
             print("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupCenters), added_edges))
             added_edges = 0
-        buildingGroupGraph.add_node(index)
     
         for otherIndex, center2 in buildingGroupCenters[index+1:]:
             # TODO: Performance ? use shapely STRTree for querying this (need to set index attr in geometry for this! https://github.com/Toblerity/Shapely/issues/618)
             # more than 120 meters inbetween -> very likely something in between
             if distance(center1, center2).meters < 120:
                 connection = LineString(coordinates=[center1, center2])
-                crossesStreet = True in [street.crosses(connection) for street in bordersShapelyLines]
+    
+                crossesStreet = -1
+                for streetIndex, street in enumerate(bordersShapelyLines):
+                    if street.crosses(connection):
+                        crossesStreet = streetIndex
+                        break
+                
                 #if VISUALIZE_EDGES:
                 #    folium.vector_layers.PolyLine([(center1[1], center1[0]), (center2[1], center2[0])]).add_to(edges)
-                if not crossesStreet:
+                if crossesStreet == -1:
                     added_edges += 1
                     buildingGroupGraph.add_edge(index, otherIndex)
                 else:
-                    "filler"
-                    #buildingGroupGraph.node[index].get('borders', {}).add()
-                    #buildingGroupGraph.node[otherIndex].get('borders', {}).add()
-                    #TODO: street as border of group (then propagate to region)
-                    # TODO: save as node property via buildingGroupGraph.node[index]['borders'] 
+                    buildingGroupGraph.node[index]['borders'].add(crossesStreet)
+                    buildingGroupGraph.node[otherIndex]['borders'].add(crossesStreet)
 
     regionComponents = nx.connected_components(buildingGroupGraph)
 
@@ -110,9 +116,12 @@ def buildRegions(buildingGroups, borders):
         groupForRegionGeometries = [shape(group["geometry"]) for group in groupsForRegion] 
         # TODO: use saved streets for this regions (for refining geometry) (find method for refinement)
         regionShape = unary_union(groupForRegionGeometries).convex_hull
+
+        borderIndexes = set.union(*[buildingGroupGraph.node[index]['borders'] for index in indexes])
+        regionBorders = [borders["features"][index]["properties"].get("name", "border{}".format(index)) for index in borderIndexes]
         groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
 
-        region = shapeGeomToGeoJson(regionShape, properties={"regionId": id, "buildingGroups": groupIds})
+        region = shapeGeomToGeoJson(regionShape, properties={"regionId": id, "buildingGroups": groupIds, "regionBorders": regionBorders})
         buildingRegions.append(region)
 
     logger.info("ApartmentRegions: {}".format(len(buildingRegions)))
@@ -144,23 +153,21 @@ if __name__ == "__main__":
     # Poor Mans Testing
     buildings = geojson.FeatureCollection(buildings["features"][:200])
 
-    annotater = [AddressAnnotator('Pieschen, Dresden, Germany'), BuildingLvlAnnotator(), CompanyAnnotator(), BuildingTypeClassifier()]
-
-    for annotator in annotater:
-        buildings = annotator.annotateAll(buildings)
-
-    logger.info("Annotated {} buildings".format(len(buildings["features"])))
-
     groups = buildGroups(buildings)
-    # Todo: to this for all annotater
-    groups = AddressAnnotator.aggregateToGroup(buildings, groups)
-
+    
     borders = unionFeatureCollections(*list(osmData))
-
     # TODO: add landuse ways to regions (could be also seperate regions) f.i. police, forest, grass
     #           allointments (kleingaerten) 
     #           leisure like sports_centre, park
     regions = buildRegions(groups, borders)
+
+    # TODO: buildings with yes often lay inside f.i. hospital (amenity = hospital | healthcare = hospital) or landuse = police
+    annotater = [AddressAnnotator('Pieschen, Dresden, Germany'), BuildingLvlAnnotator(), CompanyAnnotator(), BuildingTypeClassifier()]
+    logger.info("Annotated {} buildings".format(len(buildings["features"])))
+    for annotator in annotater:
+        buildings = annotator.annotateAll(buildings)
+    # Todo: to this for all annotater
+    groups = AddressAnnotator.aggregateToGroup(buildings, groups)
     # TODO: do this for all annotater
     regions = AddressAnnotator.aggregateToRegions(groups, regions)
 
