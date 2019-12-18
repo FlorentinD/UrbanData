@@ -1,4 +1,5 @@
 import re
+import geojson
 from collections import defaultdict
 from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
@@ -41,9 +42,9 @@ class AddressAnnotator(OsmAnnotator):
         objectGeometry = shape(object["geometry"])
         containsAddress = [key for key in object["properties"].keys() if key.startswith("addr:housenumber")]
         if containsAddress:
-            postalCode = object["properties"].get("addr:postcode", None)
-            street = object["properties"].get("addr:street", None)
-            houseNumber = object["properties"].get("addr:housenumber", None)
+            postalCode = object["properties"].get("addr:postcode")
+            street = object["properties"].get("addr:street")
+            houseNumber = object["properties"].get("addr:housenumber")
             key = self.generateAddressKey(postalCode, street)
             addresses = {key: [houseNumber]}
         else:
@@ -54,9 +55,9 @@ class AddressAnnotator(OsmAnnotator):
                 for location in self.dataSource:
                     # 'contains' not enough for polygons having points on its edges 
                     if objectGeometry.intersects(location["geometry"]):
-                        postalCode = location["properties"].get("addr:postcode", None)
-                        street = location["properties"].get("addr:street", None)
-                        houseNumber = location["properties"].get("addr:housenumber", None)
+                        postalCode = location["properties"].get("addr:postcode")
+                        street = location["properties"].get("addr:street")
+                        houseNumber = location["properties"].get("addr:housenumber")
                         key = self.generateAddressKey(postalCode, street)
                         addresses[key].append(houseNumber)
         # ! can still be empty (f.i. https://www.openstreetmap.org/way/35540321 or https://www.openstreetmap.org/way/32610207) could only be solved by taking nearest element with address 
@@ -67,12 +68,28 @@ class AddressAnnotator(OsmAnnotator):
         matchingLocations = [loc for loc in self.dataSource if loc["properties"]["__nodeId"] in nodeIds]
         addresses = defaultdict(list)
         for location in matchingLocations:
-            postalCode = location["properties"].get("addr:postcode", None)
-            street = location["properties"].get("addr:street", None)
-            houseNumber = location["properties"].get("addr:housenumber", None)
+            postalCode = location["properties"].get("addr:postcode")
+            street = location["properties"].get("addr:street")
+            houseNumber = location["properties"].get("addr:housenumber")
             key = self.generateAddressKey(postalCode, street)
             addresses[key].append(houseNumber)
         return addresses
+
+    @classmethod
+    def aggregateToGroup(cls, buildings, groups, foreignKey = "buildings"):
+        groupFeatures = groups["features"]
+        buildingFeatures = buildings["features"]
+        for group in groupFeatures:
+            buildingAddresses = [buildingFeatures[index]["properties"].get(cls.writeProperty) for index in group["properties"][foreignKey]]
+            groupAddresses = cls.unionAddresses(buildingAddresses)
+            group["properties"][cls.writeProperty] = groupAddresses
+
+        return geojson.FeatureCollection(groupFeatures)
+    
+    @classmethod
+    def aggregateToRegions(cls, groups, regions, foreignKey = "buildingGroups"):
+        # the same in this case
+        return cls.aggregateToGroup(groups, regions, foreignKey)
 
     @staticmethod
     def unionAddresses(addresses):

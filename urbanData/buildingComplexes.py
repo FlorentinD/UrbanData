@@ -53,11 +53,8 @@ def buildGroups(buildings):
         buildingGeometries = [allBuildingsShapeGeom[index][1] for index in indexes]
         groupShape = unary_union(buildingGeometries)
         buildingIds = list(indexes)
-        # TODO: do later
-        buildingAddresses = [buildings["features"][index]["properties"].get("addresses", None) for index in indexes]
-        groupAddresses = AddressAnnotator.unionAddresses(buildingAddresses)
 
-        buildingGroup = shapeGeomToGeoJson(groupShape, properties={"addresses": groupAddresses, "groupId": id, "__buildings": buildingIds })
+        buildingGroup = shapeGeomToGeoJson(groupShape, properties={"groupId": id, "buildings": buildingIds })
         buildingGroups.append(buildingGroup)
 
     logger.info("BuildingGroups: {}".format(len(buildingGroups)))
@@ -100,6 +97,8 @@ def buildRegions(buildingGroups, borders):
                     buildingGroupGraph.add_edge(index, otherIndex)
                 else:
                     "filler"
+                    #buildingGroupGraph.node[index].get('borders', {}).add()
+                    #buildingGroupGraph.node[otherIndex].get('borders', {}).add()
                     #TODO: street as border of group (then propagate to region)
                     # TODO: save as node property via buildingGroupGraph.node[index]['borders'] 
 
@@ -113,11 +112,7 @@ def buildRegions(buildingGroups, borders):
         regionShape = unary_union(groupForRegionGeometries).convex_hull
         groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
 
-        # TODO: extract into later 
-        groupAddresses = [buildingGroups["features"][index]["properties"].get("addresses", None) for index in indexes]
-        regionAddresses = AddressAnnotator.unionAddresses(groupAddresses)
-
-        region = shapeGeomToGeoJson(regionShape, properties={"addresses": regionAddresses, "regionId": id, "buildingGroups": groupIds})
+        region = shapeGeomToGeoJson(regionShape, properties={"regionId": id, "buildingGroups": groupIds})
         buildingRegions.append(region)
 
     logger.info("ApartmentRegions: {}".format(len(buildingRegions)))
@@ -147,11 +142,9 @@ if __name__ == "__main__":
 
     logger.info("Loaded {} buildings".format(len(buildings["features"])))
     # Poor Mans Testing
-    buildings = geojson.FeatureCollection(buildings["features"])
+    buildings = geojson.FeatureCollection(buildings["features"][:200])
 
-    addressAnnotator = AddressAnnotator('Pieschen, Dresden, Germany')
-
-    annotater = [addressAnnotator, BuildingLvlAnnotator(), CompanyAnnotator(), BuildingTypeClassifier()]
+    annotater = [AddressAnnotator('Pieschen, Dresden, Germany'), BuildingLvlAnnotator(), CompanyAnnotator(), BuildingTypeClassifier()]
 
     for annotator in annotater:
         buildings = annotator.annotateAll(buildings)
@@ -159,6 +152,8 @@ if __name__ == "__main__":
     logger.info("Annotated {} buildings".format(len(buildings["features"])))
 
     groups = buildGroups(buildings)
+    # Todo: to this for all annotater
+    groups = AddressAnnotator.aggregateToGroup(buildings, groups)
 
     borders = unionFeatureCollections(*list(osmData))
 
@@ -166,9 +161,10 @@ if __name__ == "__main__":
     #           allointments (kleingaerten) 
     #           leisure like sports_centre, park
     regions = buildRegions(groups, borders)
+    # TODO: do this for all annotater
+    regions = AddressAnnotator.aggregateToRegions(groups, regions)
 
-    # TODO: pull apart property analysis and region building
-    #TODO: annotate with groups and regions with aggregated properties 
+    # TODO: probably calls aggregate on all Annotaters (building -> group) and aggregate (group -> region)
     logger.info("save complexes and regions")
 
     with open("out/data/apartmentGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
