@@ -42,7 +42,7 @@ class Annotator():
         return FeatureCollection(groupFeatures)
 
     def aggregateToGroups(self, buildings, groups):
-        return self.aggregate(buildings, groups, "buildings", self.aggregateProperties)
+        return self.aggregate(buildings, groups, "__buildings", self.aggregateProperties)
 
     def aggregateToRegions(self, groups, regions):
-        return self.aggregate(groups, regions, "buildingGroups", self.aggregateProperties)
+        return self.aggregate(groups, regions, "__buildingGroups", self.aggregateProperties)

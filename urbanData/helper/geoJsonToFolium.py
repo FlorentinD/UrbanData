@@ -33,9 +33,16 @@ def enhanceFeatureName(name, color, count) -> str:
     return itemString.format(color, name, count)
 
 def escapePropertyValue(value):
+    """escape and insert line breaks for a friendly description output"""
     if isinstance(value, str):
+        # ` was not allowed in Leatleaf JS 
         return value.replace("`", "\`")
     if isinstance(value, list):
+        itemsPerLine = 6
+        numberOfLineBreaks = round(len(value) / itemsPerLine)
+        if numberOfLineBreaks:
+            for i in range(1, numberOfLineBreaks):
+                value.insert(i * itemsPerLine, "<br>")
         return [escapePropertyValue(v) for v in value]
     if isinstance(value, dict):
         return "<br>".join(["&nbsp;&nbsp; {}: {}".format(k,v) for k, v in value.items()])
@@ -50,22 +57,19 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
     # Self mapped as geojson layer not fully functional yet (open PRs)
     for feature in geoFeatureCollection["features"]:
             geom = feature["geometry"]
-            # ` was not allowed in Leatleaf JS 
-            describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items() if not k.startswith("__") and v])
+            describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items() if not k.startswith("__")])
             if geom["type"] == "Point":
                 loc = geom["coordinates"]
                 if switchLatAndLong:
                     point = (loc[1], loc[0])
                 else:
                     point = (loc[0], loc[1])
-                # ! switch lat and lon in coordinate
                 folium.vector_layers.CircleMarker(
                     location=point, 
                     radius=3, 
                     tooltip=describtion, 
                     color=color).add_to(featureCollection)
             elif geom["type"] == "LineString":
-                # ! switch lat and lon in coordinate
                 if switchLatAndLong:
                     loc = [(point[1], point[0])
                             for point in geom["coordinates"]]

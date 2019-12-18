@@ -83,7 +83,10 @@ class CompanyAnnotator(Annotator):
                         if entrances > 0:
                             findMatch = True
                             compainesAdded += 1
-                            companyEntry = (company["name"], company.get("branch", "various"), entrances)
+                            branch = company["branch"].strip()
+                            if not branch:
+                                branch = "various"
+                            companyEntry = (company["name"], branch, entrances)
                             if self.writeProperty in building.keys():
                                 building["properties"][self.writeProperty].append(companyEntry)
                             else:
@@ -109,7 +112,7 @@ class CompanyAnnotator(Annotator):
             return entrancesPerBranch
     
     def aggregateToRegions(self, groups, regions):
-        return self.aggregate(groups, regions, "buildingGroups", self.aggregateGroupProperties)
+        return self.aggregate(groups, regions, "__buildingGroups", self.aggregateGroupProperties)
 
     def aggregateGroupProperties(self, properties):
         entrancesPerBranch = defaultdict(int)
