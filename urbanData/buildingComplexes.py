@@ -56,9 +56,13 @@ def buildGroups(buildings):
 
         buildingGroup = shapeGeomToGeoJson(groupShape, properties={
             "groupId": id, 
-            "buildings": buildingIds, 
-            "area": {"ground": groupShape.area} })
+            "__buildings": buildingIds, 
+            "area": {"ground": sum([geom.area for geom in buildingGeometries])} })
         buildingGroups.append(buildingGroup)
+
+        for bId in buildingIds:
+            buildings["features"][bId]["properties"]["groupId"] = id 
+            buildings["features"][bId]["properties"]["area"] = {"ground": allBuildingsShapeGeom[index][1].area}
 
     logger.info("BuildingGroups: {}".format(len(buildingGroups)))
 
@@ -126,23 +130,56 @@ def buildRegions(buildingGroups, borders):
 
         region = shapeGeomToGeoJson(regionShape, properties={
             "regionId": id, 
-            "buildingGroups": groupIds, 
+            "__buildingGroups": groupIds, 
             "regionBorders": regionBorders,
-            "area": {"ground": regionShape.area}})
+            "area": {"ground": sum([geom.area for geom in groupForRegionGeometries])}})
         buildingRegions.append(region)
+
+        for group in groupsForRegion:
+            group["properties"]["regionId"] = id 
 
     logger.info("ApartmentRegions: {}".format(len(buildingRegions)))
     return geojson.FeatureCollection(buildingRegions)
 
+def buildGroupsAndRegions(buildings, borders):
+    groups = buildGroups(buildings)
+    regions = buildRegions(groups, borders)
+    return (groups, regions)
+
+def annotateTotalArea(buildings, groups, regions):
+    """based on number of levels and ground area of buildings"""
+    # TODO: now only on region avg ... could be improved on group avg first 
+    #       also add region and group id to every building for faster computation
+    logger.info("Computing total area of buildings")
+    for building in buildings["features"]:
+        buildingLevels = building["properties"].get("levels")
+        groundArea = building["properties"]["area"]["ground"]
+        if not buildingLevels:
+            groupId = building["properties"]["groupId"]
+            avgGroupLevel = groups["features"][groupId]["properties"]["levels"]
+            buildingLevels = round(avgGroupLevel)
+            if not avgGroupLevel:
+                regionId = groups["features"][groupId]["properties"]["regionId"]
+                avgRegionLevel = regions["features"][regionId]["properties"]["levels"]
+                buildingLevels = round(avgRegionLevel)
+                if not avgRegionLevel:
+                    # could be finally borough avg maybe
+                    buildingLevels = 1
+        building["properties"]["area"]["total"] = buildingLevels *  groundArea
+    
+    for group in groups["features"]:
+        group["properties"]["area"]["total"] = sum(
+            [buildings["features"][buildingId]["properties"]["area"]["total"] for buildingId in group["properties"]["__buildings"]])
+    
+    for region in regions["features"]:
+        region["properties"]["area"]["total"] = sum(
+            [groups["features"][groupId]["properties"]["area"]["total"] for groupId in region["properties"]["__buildingGroups"]])
+    return (buildings, groups, regions)
 
 logger = logging.getLogger('')
 logging.basicConfig(level=logging.INFO)
 
 if __name__ == "__main__":
-    #homesSelector = ['building~"apartments|terrace|house"', 'abandoned!~"yes"']
-    #homesQuery = OsmDataQuery("homes", OsmObjectType.WAY, homesSelector)
-
-
     allBuildingsQuery = OsmDataQuery("homes", OsmObjectType.WAY, ['"building"', 'abandoned!~"yes"'])
 
     pieschen = Nominatim().query('Pieschen, Dresden, Germany')
@@ -155,18 +192,24 @@ if __name__ == "__main__":
     osmData = OverPassHelper().directFetch(pieschen.areaId(), osmQueries)
 
     buildings = next(osmData)
+    borders = unionFeatureCollections(*list(osmData))
 
     logger.info("Loaded {} buildings".format(len(buildings["features"])))
     # Poor Mans Testing
-    #buildings = geojson.FeatureCollection(buildings["features"][:200])
+    # buildings = geojson.FeatureCollection(buildings["features"][:200])
 
-    groups = buildGroups(buildings)
-    
-    borders = unionFeatureCollections(*list(osmData))
-    # TODO: add landuse ways to regions (could be also seperate regions) f.i. police, forest, grass
-    #           allointments (kleingaerten) 
-    #           leisure like sports_centre, park
-    regions = buildRegions(groups, borders)
+    alreadyBuiltRegions = False
+    if not alreadyBuiltRegions:
+        groups, regions = buildGroupsAndRegions(buildings, borders)
+    else:
+        logger.info("Loading groups and regions")
+        with open("out/data/buildingGroups_pieschen.json", encoding='UTF-8') as file:
+            groups = json.load(file)
+        with open("out/data/buildingRegions_pieschen.json", encoding='UTF-8') as file:
+            regions = json.load(file)
+
+    # TODO: boroughs (including parks, forest, allointments and sport centers?)
+  
 
     # TODO: buildings with yes often lay inside f.i. hospital (amenity = hospital | healthcare = hospital) or landuse = police
     annotater = [AddressAnnotator('Pieschen, Dresden, Germany'), BuildingLvlAnnotator(), CompanyAnnotator(), BuildingTypeClassifier()]
@@ -176,13 +219,14 @@ if __name__ == "__main__":
         buildings = annotator.annotateAll(buildings)
         groups = annotator.aggregateToGroups(buildings, groups)
         regions = annotator.aggregateToRegions(groups, regions)
+    
+    annotateTotalArea(buildings, groups, regions)
 
-    # TODO: probably calls aggregate on all Annotaters (building -> group) and aggregate (group -> region)
     logger.info("save complexes and regions")
 
-    with open("out/data/apartmentGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
+    with open("out/data/buildingGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(groups, outfile)
-    with open("out/data/apartmentRegions_pieschen.json", 'w', encoding='UTF-8') as outfile:
+    with open("out/data/buildingRegions_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(regions, outfile)
 
 
