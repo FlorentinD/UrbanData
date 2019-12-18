@@ -1,5 +1,6 @@
 import re
 import geojson
+import statistics
 from collections import defaultdict
 from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
@@ -31,6 +32,7 @@ class AddressAnnotator(OsmAnnotator):
         f.i. buildings gets addresses of all entrances"""
 
     writeProperty = "addresses"
+    # TODO: allow addresses only with HouseNumber and fill in the missing details from surrounding (at buildingGroup level)
     osmSelector = ['"addr:street"', '"addr:housenumber"']
     
     @staticmethod
@@ -74,25 +76,9 @@ class AddressAnnotator(OsmAnnotator):
             key = self.generateAddressKey(postalCode, street)
             addresses[key].append(houseNumber)
         return addresses
-
-    @classmethod
-    def aggregateToGroup(cls, buildings, groups, foreignKey = "buildings"):
-        groupFeatures = groups["features"]
-        buildingFeatures = buildings["features"]
-        for group in groupFeatures:
-            buildingAddresses = [buildingFeatures[index]["properties"].get(cls.writeProperty) for index in group["properties"][foreignKey]]
-            groupAddresses = cls.unionAddresses(buildingAddresses)
-            group["properties"][cls.writeProperty] = groupAddresses
-
-        return geojson.FeatureCollection(groupFeatures)
     
-    @classmethod
-    def aggregateToRegions(cls, groups, regions, foreignKey = "buildingGroups"):
-        # the same in this case
-        return cls.aggregateToGroup(groups, regions, foreignKey)
-
     @staticmethod
-    def unionAddresses(addresses):
+    def aggregateProperties(addresses):
         """unions multiple addresses"""
         union = defaultdict(list)
         for dic in addresses:
@@ -113,7 +99,7 @@ class BuildingLvlAnnotator(Annotator):
         pass
 
     def annotate(self, object):
-        """ assumes 0 levels means, it is not defined"""
+        """ assumes 0 levels, if is not defined"""
         properties : dict = object["properties"]
         buildingLevels = int(properties.get("building:levels", 0))
         buildingMinLevels = int(properties.get("building:min_level", 0))
@@ -121,9 +107,14 @@ class BuildingLvlAnnotator(Annotator):
         object["properties"][self.writeProperty] = buildingLevels - buildingMinLevels + roofLevels
         return object
 
-    def aggregate(self, objects):
-        """aggregate to avg levels in group/region"""
-        raise NotImplementedError
+    @staticmethod
+    def aggregateProperties(buildingLevels):
+        """avg building level"""
+        levels = [lvl for lvl in buildingLevels if not lvl == 0]
+        result = 0
+        if levels:
+            result = statistics.mean(levels)
+        return result
 
 
 
@@ -160,7 +151,7 @@ class BuildingTypeClassifier(Annotator):
                 types.add("industrial")
             elif re.match("retail|shop|supermarket|service|commercial", buildingType):
                 types.add("commercial")
-            elif re.match("public|", buildingType):
+            elif re.match("public", buildingType):
                 types.add("public admin")
             elif re.match("collapsed", buildingType):
                 types.add("abandoned")
@@ -171,3 +162,8 @@ class BuildingTypeClassifier(Annotator):
         #       depends on companies/restaurants being already mapped onto building
             # TODO: health, public, food/restaurant, commerce, education, safety, public admin, ... 
         return list(types)
+
+    @staticmethod
+    def aggregateProperties(types):
+        """distinct union of types"""
+        return list(set().union(*types))

@@ -54,7 +54,10 @@ def buildGroups(buildings):
         groupShape = unary_union(buildingGeometries)
         buildingIds = list(indexes)
 
-        buildingGroup = shapeGeomToGeoJson(groupShape, properties={"groupId": id, "buildings": buildingIds })
+        buildingGroup = shapeGeomToGeoJson(groupShape, properties={
+            "groupId": id, 
+            "buildings": buildingIds, 
+            "area": {"ground": groupShape.area} })
         buildingGroups.append(buildingGroup)
 
     logger.info("BuildingGroups: {}".format(len(buildingGroups)))
@@ -121,7 +124,11 @@ def buildRegions(buildingGroups, borders):
         regionBorders = [borders["features"][index]["properties"].get("name", "border{}".format(index)) for index in borderIndexes]
         groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
 
-        region = shapeGeomToGeoJson(regionShape, properties={"regionId": id, "buildingGroups": groupIds, "regionBorders": regionBorders})
+        region = shapeGeomToGeoJson(regionShape, properties={
+            "regionId": id, 
+            "buildingGroups": groupIds, 
+            "regionBorders": regionBorders,
+            "area": {"ground": regionShape.area}})
         buildingRegions.append(region)
 
     logger.info("ApartmentRegions: {}".format(len(buildingRegions)))
@@ -151,7 +158,7 @@ if __name__ == "__main__":
 
     logger.info("Loaded {} buildings".format(len(buildings["features"])))
     # Poor Mans Testing
-    buildings = geojson.FeatureCollection(buildings["features"][:200])
+    #buildings = geojson.FeatureCollection(buildings["features"][:200])
 
     groups = buildGroups(buildings)
     
@@ -163,13 +170,12 @@ if __name__ == "__main__":
 
     # TODO: buildings with yes often lay inside f.i. hospital (amenity = hospital | healthcare = hospital) or landuse = police
     annotater = [AddressAnnotator('Pieschen, Dresden, Germany'), BuildingLvlAnnotator(), CompanyAnnotator(), BuildingTypeClassifier()]
-    logger.info("Annotated {} buildings".format(len(buildings["features"])))
+    
+    logger.info("Annotating buldings, groups and regions".format(len(buildings["features"])))
     for annotator in annotater:
         buildings = annotator.annotateAll(buildings)
-    # Todo: to this for all annotater
-    groups = AddressAnnotator.aggregateToGroup(buildings, groups)
-    # TODO: do this for all annotater
-    regions = AddressAnnotator.aggregateToRegions(groups, regions)
+        groups = annotator.aggregateToGroups(buildings, groups)
+        regions = annotator.aggregateToRegions(groups, regions)
 
     # TODO: probably calls aggregate on all Annotaters (building -> group) and aggregate (group -> region)
     logger.info("save complexes and regions")

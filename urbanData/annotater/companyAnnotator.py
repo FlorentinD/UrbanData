@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import re
 from geojson import FeatureCollection
 from csv import DictReader
-
+from collections import defaultdict
 from annotater.annotator import Annotator
 from annotater.osmAnnotater import AddressAnnotator
 
@@ -83,7 +83,7 @@ class CompanyAnnotator(Annotator):
                         if entrances > 0:
                             findMatch = True
                             compainesAdded += 1
-                            companyEntry = (company["name"], company["branch"], entrances)
+                            companyEntry = (company["name"], company.get("branch", "various"), entrances)
                             if self.writeProperty in building.keys():
                                 building["properties"][self.writeProperty].append(companyEntry)
                             else:
@@ -97,6 +97,26 @@ class CompanyAnnotator(Annotator):
 
     def annotate(self, building):
         raise NotImplementedError("Each company is mapped to one or more buildings instead of building to company")
+    
+    def aggregateProperties(self, buildingProperties):
+        # TODO: remove duplicates here?
+        entrancesPerBranch = defaultdict(int)
+        for companiesPerBuilding in buildingProperties:
+            # as None is not iterable
+            if companiesPerBuilding:
+                for _, branch, entrances in companiesPerBuilding:
+                    entrancesPerBranch[branch] += entrances
+            return entrancesPerBranch
+    
+    def aggregateToRegions(self, groups, regions):
+        return self.aggregate(groups, regions, "buildingGroups", self.aggregateGroupProperties)
+
+    def aggregateGroupProperties(self, properties):
+        entrancesPerBranch = defaultdict(int)
+        for groupDic in properties:
+            for branch, entrances in groupDic.items():
+                entrancesPerBranch[branch] += entrances
+        return entrancesPerBranch
 
     @staticmethod
     def extractHousenumber(input):

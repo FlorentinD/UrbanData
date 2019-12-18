@@ -24,4 +24,25 @@ class Annotator():
 
     @abstractmethod
     def annotate(self, object):
-       raise NotImplementedError
+       raise NotImplementedError(__name__)
+
+    @staticmethod
+    @abstractmethod
+    def aggregateProperties(properties):
+       raise NotImplementedError(__name__)
+
+    def aggregate(self, buildings, groups, foreignKey, aggregateFunc):
+        groupFeatures = groups["features"]
+        buildingFeatures = buildings["features"]
+        for group in groupFeatures:
+            buildingProperties = [buildingFeatures[index]["properties"].get(self.writeProperty) for index in group["properties"][foreignKey]]
+            groupProperty = aggregateFunc(buildingProperties)
+            group["properties"][self.writeProperty] = groupProperty
+
+        return FeatureCollection(groupFeatures)
+
+    def aggregateToGroups(self, buildings, groups):
+        return self.aggregate(buildings, groups, "buildings", self.aggregateProperties)
+
+    def aggregateToRegions(self, groups, regions):
+        return self.aggregate(groups, regions, "buildingGroups", self.aggregateProperties)
