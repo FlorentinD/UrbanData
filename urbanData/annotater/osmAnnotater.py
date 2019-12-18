@@ -120,14 +120,14 @@ class BuildingTypeClassifier(Annotator):
         pass
 
     def annotate(self, object):
-        object[self.writeProperty] = self.classify(object)
+        object["properties"][self.writeProperty] = self.classify(object)
         return object
 
     def classify(self, object):
         types : set = set()
+        buildingType = object["properties"].get("building")
         # TODO: extract types in enum with matching regexps
-        buildingType = object.get("building", None)
-        if object.get("abandoned", None) == "yes":
+        if object.get("abandoned") == "yes":
             types.add("abandoned")
         elif buildingType:
             if re.match("yes", buildingType):

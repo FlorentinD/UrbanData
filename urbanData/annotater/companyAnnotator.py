@@ -64,9 +64,9 @@ class CompanyAnnotator(Annotator):
             findMatch = False
             for building in buildings["features"]:
                 # TODO: look for values first and then check if key could match ?
-                addresses = building["properties"].get("addresses", None)
+                addresses = building["properties"].get("addresses")
                 if addresses:
-                    houseNumbers = addresses.get(addressKey, None)
+                    houseNumbers = addresses.get(addressKey)
                     if houseNumbers:
                         entrances = 0
                         if isinstance(companyHouseNumber, str):
@@ -85,9 +85,9 @@ class CompanyAnnotator(Annotator):
                             compainesAdded += 1
                             companyEntry = (company["name"], company["branch"], entrances)
                             if self.writeProperty in building.keys():
-                                building[self.writeProperty].append(companyEntry)
+                                building["properties"][self.writeProperty].append(companyEntry)
                             else:
-                                building[self.writeProperty] = [companyEntry]
+                                building["properties"][self.writeProperty] = [companyEntry]
             if not findMatch:
                 self.logger.debug("{}: Could not find building for {}".format(__name__, company))
         # TODO: find out missing companies
