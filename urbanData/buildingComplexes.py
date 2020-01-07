@@ -9,7 +9,6 @@ import networkx as nx
 import pyproj
 from shapely.geometry import Polygon, LineString, mapping, shape
 from shapely.ops import unary_union, transform
-from geopy.distance import distance
 from OSMPythonTools.nominatim import Nominatim
 
 from helper.overPassHelper import OverPassHelper
@@ -32,6 +31,7 @@ from annotater.buildingLvlAnnotator import BuildingLvlAnnotator
 
 # TODO: function to map region id based for an object (based on address or just geometry)
 # tag order to analyse: public, leisure, amenity, buldings, landuse, office ? ... check if company?
+
 
 def buildGroups(buildings):
     """groups buildings together, with at least one common point returns a geo-json featurecollections
@@ -70,26 +70,22 @@ def buildGroups(buildings):
 
     return geojson.FeatureCollection(buildingGroups)
 
-def getPolygonArea(building):
-    """transforms coordinates to utm and returns area in m²"""
-    # TODO: derive Zone from coordinates (center)
+def withUTMCoord(building):
+     # TODO: derive Zone from coordinates (center)
     project = pyproj.Proj(proj='utm', zone=33, ellps='WGS84', preserve_units = False)
-    buildingWithUTM = transform(project, building)
-    return round(buildingWithUTM.area)
-
+    return transform(project, building)
 
 def buildRegions(buildingGroups, borders):
     """buildingGroup expansion (if no borders inbetween -> union)"""
 
-    # TODO: if group is To large ... use multiple points ?!
-    # center coordinates for each buildingGroup
-    buildingGroupCenters = list(enumerate([shape(building["geometry"]).centroid.coords[0] for building in buildingGroups["features"]]))
-    # borders between building-groups
-    bordersShapelyLines = [shape(street["geometry"]) for street in borders["features"]] 
+    buildingGroupGeoShapes = list(enumerate([withUTMCoord(shape(building["geometry"])) for building in buildingGroups["features"]]))
+
+    # borders between building-groups ! also need to be in UTM !
+    bordersShapelyLines = [withUTMCoord(shape(street["geometry"])) for street in borders["features"]] 
 
     buildingGroupGraph = nx.Graph()
     # init graph 
-    for index, _ in buildingGroupCenters:
+    for index, _ in buildingGroupGeoShapes:
         buildingGroupGraph.add_node(index, borders = set())
 
     #visualize_edges = True
@@ -97,26 +93,27 @@ def buildRegions(buildingGroups, borders):
     #    edges = folium.FeatureGroup("edges between home-groups")
 
     added_edges = 0
-
-    for index, center1 in buildingGroupCenters:
+    for index, bShape in buildingGroupGeoShapes:
         if((index + 1) % 50 == 0 and not index == 0):
-            logger.debug("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupCenters), added_edges))
+            logger.debug("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupGeoShapes), added_edges))
             added_edges = 0
     
-        for otherIndex, center2 in buildingGroupCenters[index+1:]:
+        for otherIndex, otherBShape in buildingGroupGeoShapes[index+1:]:
             # TODO: Performance ? use shapely STRTree for querying this (need to set index attr in geometry for this! https://github.com/Toblerity/Shapely/issues/618)
             # more than 120 meters inbetween -> very likely something in between
-            if distance(center1, center2).meters < 120:
-                connection = LineString(coordinates=[center1, center2])
-    
+            MAX_GROUP_DISTANCE = 120
+            distance = bShape.distance(otherBShape)
+            if distance < MAX_GROUP_DISTANCE:
+                center = bShape.centroid.coords[0]
+                otherCenter = otherBShape.centroid.coords[0]
+                connection = LineString(coordinates=[center, otherCenter])
+
                 crossesStreet = -1
                 for streetIndex, street in enumerate(bordersShapelyLines):
                     if street.crosses(connection):
                         crossesStreet = streetIndex
                         break
-                
-                #if VISUALIZE_EDGES:
-                #    folium.vector_layers.PolyLine([(center1[1], center1[0]), (center2[1], center2[0])]).add_to(edges)
+
                 if crossesStreet == -1:
                     added_edges += 1
                     buildingGroupGraph.add_edge(index, otherIndex)
@@ -147,7 +144,7 @@ def buildRegions(buildingGroups, borders):
         for group in groupsForRegion:
             group["properties"]["regionId"] = id 
 
-    logger.info("ApartmentRegions: {}".format(len(buildingRegions)))
+    logger.info("Building Regions: {}".format(len(buildingRegions)))
     return geojson.FeatureCollection(buildingRegions)
 
 def buildGroupsAndRegions(buildings, borders):
@@ -155,15 +152,20 @@ def buildGroupsAndRegions(buildings, borders):
     regions = buildRegions(groups, borders)
     return (groups, regions)
 
+def getPolygonArea(building):
+    """transforms coordinates to utm and returns area in m²"""
+    buildingWithUTM = withUTMCoord(building)
+    return round(buildingWithUTM.area)
+
 def annotateArea(buildings, groups, regions):
     """based on number of levels of buildings"""
-    BUILDINGAREA_KEY = "buildingArea in m2"
+    BUILDINGAREA_KEY = "buildingArea"
     # TODO: rewrite as annotater
-    logger.info("Computing total area of buildings")
+    logger.info("Starting area annotation")
     for building in buildings["features"]:
         buildingLevels = building["properties"].get("levels")
         groundArea = getPolygonArea(shape(building["geometry"]))
-        building["properties"][BUILDINGAREA_KEY] = {"ground": groundArea}
+        building["properties"][BUILDINGAREA_KEY] = {"ground in m2": groundArea}
         if not buildingLevels:
             groupId = building["properties"]["groupId"]
             avgGroupLevel = groups["features"][groupId]["properties"]["levels"]
@@ -176,22 +178,31 @@ def annotateArea(buildings, groups, regions):
                     # could be finally borough avg maybe
                     buildingLevels = 1
             building["properties"]["estimatedLevels"] = buildingLevels
-        building["properties"][BUILDINGAREA_KEY]["total"] = buildingLevels *  groundArea
+        building["properties"][BUILDINGAREA_KEY]["total in m2"] = buildingLevels *  groundArea
     
     for group in groups["features"]:
         group["properties"][BUILDINGAREA_KEY] = {
-            "ground": sum(
-                [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["ground"] for buildingId in group["properties"]["__buildings"]]),
-            "total": sum(
-                [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["total"] for buildingId in group["properties"]["__buildings"]])
+            "ground in m2": sum(
+                [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["ground in m2"] for buildingId in group["properties"]["__buildings"]]),
+            "total in m2": sum(
+                [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["total in m2"] for buildingId in group["properties"]["__buildings"]]),
+
+            "companyCount": sum([entries for type, entries in group["properties"]["companies"].items()]),
+            "leisureCount": sum([entries for type, entries in group["properties"]["leisures"].items()]),
+            "amenityCount": sum([entries for type, entries in group["properties"]["amenities"].items()])
         }
     
+    # very alike to above loop
     for region in regions["features"]:
         region["properties"][BUILDINGAREA_KEY] = {
-            "ground": sum(
-                [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["ground"] for groupId in region["properties"]["__buildingGroups"]]),
-            "total": sum(
-                [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["total"] for groupId in region["properties"]["__buildingGroups"]])
+            "ground in m2": sum(
+                [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["ground in m2"] for groupId in region["properties"]["__buildingGroups"]]),
+            "total in m2": sum(
+                [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["total in m2"] for groupId in region["properties"]["__buildingGroups"]]),
+            
+            "companyCount": sum([entries for type, entries in region["properties"]["companies"].items()]),
+            "leisureCount": sum([entries for type, entries in region["properties"]["leisures"].items()]),
+            "amenityCount": sum([entries for type, entries in region["properties"]["amenities"].items()])
         }
     return (buildings, groups, regions)
 
@@ -218,8 +229,9 @@ if __name__ == "__main__":
 
     alreadyBuiltRegions = False
     if not alreadyBuiltRegions:
+
         # Poor Mans Testing
-        buildings = geojson.FeatureCollection(buildings["features"][:200])
+        #buildings = geojson.FeatureCollection(buildings["features"][:200])
 
         logger.info("Fetched {} buildings".format(len(buildings["features"])))
         groups, regions = buildGroupsAndRegions(buildings, borders)
@@ -238,6 +250,7 @@ if __name__ == "__main__":
 
     # TODO: buildings with yes often lay inside f.i. hospital (amenity = hospital | healthcare = hospital) or landuse = police
     
+    # TODO: clarify dependencies between them
     annotater = [AddressAnnotator(areaOfInterest), BuildingLvlAnnotator(), CompanyAnnotator(),
                  BuildingTypeClassifier(), OsmCompaniesAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE),
                  LeisureAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), AmentiyAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE)]
@@ -270,15 +283,15 @@ if __name__ == "__main__":
     #if VISUALIZE_EDGES:
     #    edges.add_to(map)
 
-    geoFeatureCollectionToFoliumFeatureGroup(buildings, "black", name="Single apartments").add_to(map)
+    geoFeatureCollectionToFoliumFeatureGroup(buildings, "black", name="Single buildings").add_to(map)
 
     bordersFeature = geoFeatureCollectionToFoliumFeatureGroup(borders, "red", "borders")
     bordersFeature.add_to(map)
 
-    buildingGroupsFeature = geoFeatureCollectionToFoliumFeatureGroup(groups, "blue", "apartment groups")
+    buildingGroupsFeature = geoFeatureCollectionToFoliumFeatureGroup(groups, "blue", "building groups")
     buildingGroupsFeature.add_to(map)
 
-    buildingRegionsFeature = geoFeatureCollectionToFoliumFeatureGroup(regions, "green", "apartment regions")
+    buildingRegionsFeature = geoFeatureCollectionToFoliumFeatureGroup(regions, "green", "building regions")
     buildingRegionsFeature.add_to(map)
 
     folium.LayerControl().add_to(map)
