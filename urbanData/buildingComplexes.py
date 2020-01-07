@@ -5,8 +5,10 @@ import json
 import geojson
 import folium
 import networkx as nx
+
+import pyproj
 from shapely.geometry import Polygon, LineString, mapping, shape
-from shapely.ops import unary_union
+from shapely.ops import unary_union, transform
 from geopy.distance import distance
 from OSMPythonTools.nominatim import Nominatim
 
@@ -28,8 +30,8 @@ from annotater.companyAnnotator import CompanyAnnotator
 
 # TODO: function to map region id based for an object (based on address or just geometry)
 # tag order to analyse: public, leisure, amenity, buldings, landuse, office ? ... check if company?
-# house : assume one level ? (if none given)
-# terrace: sequence of houses -> count addresses contained (implicit number of entrances) (assume 1 lvl per house?)
+
+BUILDINGAREA_KEY = "buildingArea in m²"
 
 def buildGroups(buildings):
     """groups buildings together, with at least one common point returns a geo-json featurecollections
@@ -57,16 +59,23 @@ def buildGroups(buildings):
         buildingGroup = shapeGeomToGeoJson(groupShape, properties={
             "groupId": id, 
             "__buildings": buildingIds, 
-            "area": {"ground": sum([geom.area for geom in buildingGeometries])} })
+            BUILDINGAREA_KEY: {"ground": sum([getPolygonArea(geom) for geom in buildingGeometries])} })
         buildingGroups.append(buildingGroup)
 
         for bId in buildingIds:
             buildings["features"][bId]["properties"]["groupId"] = id 
-            buildings["features"][bId]["properties"]["area"] = {"ground": allBuildingsShapeGeom[index][1].area}
+            buildings["features"][bId]["properties"][BUILDINGAREA_KEY] = {"ground": getPolygonArea(allBuildingsShapeGeom[bId][1])}
 
     logger.info("BuildingGroups: {}".format(len(buildingGroups)))
 
     return geojson.FeatureCollection(buildingGroups)
+
+def getPolygonArea(building):
+    """transforms coordinates to utm and returns area in m²"""
+    # TODO: derive Zone from coordinates (center)
+    project = pyproj.Proj(proj='utm', zone=33, ellps='WGS84', preserve_units = False)
+    buildingWithUTM = transform(project, building)
+    return round(buildingWithUTM.area)
 
 
 def buildRegions(buildingGroups, borders):
@@ -132,7 +141,7 @@ def buildRegions(buildingGroups, borders):
             "regionId": id, 
             "__buildingGroups": groupIds, 
             "regionBorders": regionBorders,
-            "area": {"ground": sum([geom.area for geom in groupForRegionGeometries])}})
+            BUILDINGAREA_KEY: {"ground": sum([getPolygonArea(geom) for geom in groupForRegionGeometries])}})
         buildingRegions.append(region)
 
         for group in groupsForRegion:
@@ -148,12 +157,11 @@ def buildGroupsAndRegions(buildings, borders):
 
 def annotateTotalArea(buildings, groups, regions):
     """based on number of levels and ground area of buildings"""
-    # TODO: now only on region avg ... could be improved on group avg first 
-    #       also add region and group id to every building for faster computation
+    # TODO: rewrite as annotater
     logger.info("Computing total area of buildings")
     for building in buildings["features"]:
         buildingLevels = building["properties"].get("levels")
-        groundArea = building["properties"]["area"]["ground"]
+        groundArea = building["properties"][BUILDINGAREA_KEY]["ground"]
         if not buildingLevels:
             groupId = building["properties"]["groupId"]
             avgGroupLevel = groups["features"][groupId]["properties"]["levels"]
@@ -165,16 +173,23 @@ def annotateTotalArea(buildings, groups, regions):
                 if not avgRegionLevel:
                     # could be finally borough avg maybe
                     buildingLevels = 1
-        building["properties"]["area"]["total"] = buildingLevels *  groundArea
+            building["properties"]["estimatedLevels"] = buildingLevels
+        building["properties"][BUILDINGAREA_KEY]["total"] = buildingLevels *  groundArea
     
     for group in groups["features"]:
-        group["properties"]["area"]["total"] = sum(
-            [buildings["features"][buildingId]["properties"]["area"]["total"] for buildingId in group["properties"]["__buildings"]])
+        group["properties"][BUILDINGAREA_KEY]["ground"] = sum(
+            [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["ground"] for buildingId in group["properties"]["__buildings"]])
+        group["properties"][BUILDINGAREA_KEY]["total"] = sum(
+            [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["total"] for buildingId in group["properties"]["__buildings"]])
     
     for region in regions["features"]:
-        region["properties"]["area"]["total"] = sum(
-            [groups["features"][groupId]["properties"]["area"]["total"] for groupId in region["properties"]["__buildingGroups"]])
+        region["properties"][BUILDINGAREA_KEY]["ground"] = sum(
+            [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["ground"] for groupId in region["properties"]["__buildingGroups"]])
+        region["properties"][BUILDINGAREA_KEY]["total"] = sum(
+            [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["total"] for groupId in region["properties"]["__buildingGroups"]])
     return (buildings, groups, regions)
+
+
 
 logger = logging.getLogger('')
 logging.basicConfig(level=logging.INFO)
@@ -196,7 +211,7 @@ if __name__ == "__main__":
 
     logger.info("Loaded {} buildings".format(len(buildings["features"])))
     # Poor Mans Testing
-    # buildings = geojson.FeatureCollection(buildings["features"][:200])
+    buildings = geojson.FeatureCollection(buildings["features"][:200])
 
     alreadyBuiltRegions = False
     if not alreadyBuiltRegions:
