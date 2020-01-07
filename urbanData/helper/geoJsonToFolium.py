@@ -57,7 +57,7 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
     # Self mapped as geojson layer not fully functional yet (open PRs)
     for feature in geoFeatureCollection["features"]:
             geom = feature["geometry"]
-            describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items() if not k.startswith("__")])
+            describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items() if not k.startswith("__") and v])
             if geom["type"] == "Point":
                 loc = geom["coordinates"]
                 if switchLatAndLong:

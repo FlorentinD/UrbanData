@@ -19,8 +19,10 @@ from helper.geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup
 from helper.geoJsonConverter import shapeGeomToGeoJson
 from helper.geoJsonHelper import unionFeatureCollections
 
-from annotater.osmAnnotater import AddressAnnotator, BuildingLvlAnnotator, BuildingTypeClassifier
+from annotater.osmAnnotater import AddressAnnotator, OsmCompaniesAnnotator, AmentiyAnnotator, LeisureAnnotator
 from annotater.companyAnnotator import CompanyAnnotator
+from annotater.buildingClassifier import BuildingTypeClassifier
+from annotater.buildingLvlAnnotator import BuildingLvlAnnotator
 
 # TODO: also use "flurstuecke" from openDataDresden ?
 
@@ -30,8 +32,6 @@ from annotater.companyAnnotator import CompanyAnnotator
 
 # TODO: function to map region id based for an object (based on address or just geometry)
 # tag order to analyse: public, leisure, amenity, buldings, landuse, office ? ... check if company?
-
-BUILDINGAREA_KEY = "buildingArea in m²"
 
 def buildGroups(buildings):
     """groups buildings together, with at least one common point returns a geo-json featurecollections
@@ -58,13 +58,13 @@ def buildGroups(buildings):
 
         buildingGroup = shapeGeomToGeoJson(groupShape, properties={
             "groupId": id, 
-            "__buildings": buildingIds, 
-            BUILDINGAREA_KEY: {"ground": sum([getPolygonArea(geom) for geom in buildingGeometries])} })
+            "__buildings": buildingIds
+        })
         buildingGroups.append(buildingGroup)
 
+        # TODO: move into annotator
         for bId in buildingIds:
-            buildings["features"][bId]["properties"]["groupId"] = id 
-            buildings["features"][bId]["properties"][BUILDINGAREA_KEY] = {"ground": getPolygonArea(allBuildingsShapeGeom[bId][1])}
+            buildings["features"][bId]["properties"]["groupId"] = id
 
     logger.info("BuildingGroups: {}".format(len(buildingGroups)))
 
@@ -100,7 +100,7 @@ def buildRegions(buildingGroups, borders):
 
     for index, center1 in buildingGroupCenters:
         if((index + 1) % 50 == 0 and not index == 0):
-            print("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupCenters), added_edges))
+            logger.debug("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupCenters), added_edges))
             added_edges = 0
     
         for otherIndex, center2 in buildingGroupCenters[index+1:]:
@@ -140,8 +140,8 @@ def buildRegions(buildingGroups, borders):
         region = shapeGeomToGeoJson(regionShape, properties={
             "regionId": id, 
             "__buildingGroups": groupIds, 
-            "regionBorders": regionBorders,
-            BUILDINGAREA_KEY: {"ground": sum([getPolygonArea(geom) for geom in groupForRegionGeometries])}})
+            "regionBorders": regionBorders
+        })
         buildingRegions.append(region)
 
         for group in groupsForRegion:
@@ -155,13 +155,15 @@ def buildGroupsAndRegions(buildings, borders):
     regions = buildRegions(groups, borders)
     return (groups, regions)
 
-def annotateTotalArea(buildings, groups, regions):
-    """based on number of levels and ground area of buildings"""
+def annotateArea(buildings, groups, regions):
+    """based on number of levels of buildings"""
+    BUILDINGAREA_KEY = "buildingArea in m2"
     # TODO: rewrite as annotater
     logger.info("Computing total area of buildings")
     for building in buildings["features"]:
         buildingLevels = building["properties"].get("levels")
-        groundArea = building["properties"][BUILDINGAREA_KEY]["ground"]
+        groundArea = getPolygonArea(shape(building["geometry"]))
+        building["properties"][BUILDINGAREA_KEY] = {"ground": groundArea}
         if not buildingLevels:
             groupId = building["properties"]["groupId"]
             avgGroupLevel = groups["features"][groupId]["properties"]["levels"]
@@ -177,16 +179,20 @@ def annotateTotalArea(buildings, groups, regions):
         building["properties"][BUILDINGAREA_KEY]["total"] = buildingLevels *  groundArea
     
     for group in groups["features"]:
-        group["properties"][BUILDINGAREA_KEY]["ground"] = sum(
-            [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["ground"] for buildingId in group["properties"]["__buildings"]])
-        group["properties"][BUILDINGAREA_KEY]["total"] = sum(
-            [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["total"] for buildingId in group["properties"]["__buildings"]])
+        group["properties"][BUILDINGAREA_KEY] = {
+            "ground": sum(
+                [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["ground"] for buildingId in group["properties"]["__buildings"]]),
+            "total": sum(
+                [buildings["features"][buildingId]["properties"][BUILDINGAREA_KEY]["total"] for buildingId in group["properties"]["__buildings"]])
+        }
     
     for region in regions["features"]:
-        region["properties"][BUILDINGAREA_KEY]["ground"] = sum(
-            [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["ground"] for groupId in region["properties"]["__buildingGroups"]])
-        region["properties"][BUILDINGAREA_KEY]["total"] = sum(
-            [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["total"] for groupId in region["properties"]["__buildingGroups"]])
+        region["properties"][BUILDINGAREA_KEY] = {
+            "ground": sum(
+                [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["ground"] for groupId in region["properties"]["__buildingGroups"]]),
+            "total": sum(
+                [groups["features"][groupId]["properties"][BUILDINGAREA_KEY]["total"] for groupId in region["properties"]["__buildingGroups"]])
+        }
     return (buildings, groups, regions)
 
 
@@ -195,9 +201,10 @@ logger = logging.getLogger('')
 logging.basicConfig(level=logging.INFO)
 
 if __name__ == "__main__":
-    allBuildingsQuery = OsmDataQuery("homes", OsmObjectType.WAY, ['"building"', 'abandoned!~"yes"'])
+    areaOfInterest = 'Pieschen, Dresden, Germany'
 
-    pieschen = Nominatim().query('Pieschen, Dresden, Germany')
+    pieschen = Nominatim().query(areaOfInterest)
+    allBuildingsQuery = OsmDataQuery("homes", OsmObjectType.WAY, ['"building"', 'abandoned!~"yes"'])
     osmQueries = [ allBuildingsQuery,
             OsmDataQuery("borders", OsmObjectType.WAY,  
             ['highway~"primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|motorway|unclassified"']),
@@ -209,36 +216,44 @@ if __name__ == "__main__":
     buildings = next(osmData)
     borders = unionFeatureCollections(*list(osmData))
 
-    logger.info("Loaded {} buildings".format(len(buildings["features"])))
-    # Poor Mans Testing
-    buildings = geojson.FeatureCollection(buildings["features"][:200])
-
     alreadyBuiltRegions = False
     if not alreadyBuiltRegions:
+        # Poor Mans Testing
+        buildings = geojson.FeatureCollection(buildings["features"][:200])
+
+        logger.info("Fetched {} buildings".format(len(buildings["features"])))
         groups, regions = buildGroupsAndRegions(buildings, borders)
     else:
-        logger.info("Loading groups and regions")
+        logger.info("Loading buildings, groups and regions")
+        with open("out/data/buildings_pieschen.json", encoding='UTF-8') as file:
+            buildings = json.load(file)
         with open("out/data/buildingGroups_pieschen.json", encoding='UTF-8') as file:
             groups = json.load(file)
         with open("out/data/buildingRegions_pieschen.json", encoding='UTF-8') as file:
             regions = json.load(file)
 
+    
     # TODO: boroughs (including parks, forest, allointments and sport centers?)
   
 
     # TODO: buildings with yes often lay inside f.i. hospital (amenity = hospital | healthcare = hospital) or landuse = police
-    annotater = [AddressAnnotator('Pieschen, Dresden, Germany'), BuildingLvlAnnotator(), CompanyAnnotator(), BuildingTypeClassifier()]
     
-    logger.info("Annotating buldings, groups and regions".format(len(buildings["features"])))
+    annotater = [AddressAnnotator(areaOfInterest), BuildingLvlAnnotator(), CompanyAnnotator(),
+                 BuildingTypeClassifier(), OsmCompaniesAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE),
+                 LeisureAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), AmentiyAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE)]
+    
     for annotator in annotater:
+        logger.info("Starting {}".format(annotator.__class__.__name__))
         buildings = annotator.annotateAll(buildings)
         groups = annotator.aggregateToGroups(buildings, groups)
         regions = annotator.aggregateToRegions(groups, regions)
     
-    annotateTotalArea(buildings, groups, regions)
+    annotateArea(buildings, groups, regions)
 
     logger.info("save complexes and regions")
 
+    with open("out/data/buildings_pieschen.json", 'w', encoding='UTF-8') as outfile:
+            geojson.dump(groups, outfile)
     with open("out/data/buildingGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(groups, outfile)
     with open("out/data/buildingRegions_pieschen.json", 'w', encoding='UTF-8') as outfile:
@@ -247,7 +262,7 @@ if __name__ == "__main__":
 
     ######### Visual 
     areaName = "pieschen"
-    pieschen = Nominatim().query('Pieschen, Dresden, Germany')
+    pieschen = Nominatim().query(areaOfInterest)
     pieschenCoord = pieschen.toJSON()[0]
     map = folium.Map(
         location=[51.088534,13.723315], tiles='Open Street Map', zoom_start=15)

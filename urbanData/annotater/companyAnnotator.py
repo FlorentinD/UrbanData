@@ -3,10 +3,10 @@ import re
 from geojson import FeatureCollection
 from csv import DictReader
 from collections import defaultdict
-from annotater.annotator import Annotator
+from annotater.baseAnnotator import BaseAnnotator
 from annotater.osmAnnotater import AddressAnnotator
 
-class CompanyAnnotator(Annotator):
+class CompanyAnnotator(BaseAnnotator):
     """Annotates objects (probably buildings) with companies based on address information"""
 
     writeProperty = "companies"

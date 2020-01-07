@@ -2,7 +2,7 @@ from abc import abstractmethod
 from geojson import FeatureCollection
 import logging
 
-class Annotator():
+class BaseAnnotator():
     """Base Class for annotaters of geojson-objects
     Attributes:
         writeProperty   property which will be added to the objects by annotate()
