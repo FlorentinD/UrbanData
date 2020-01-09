@@ -2,10 +2,6 @@ from annotater.baseAnnotator import BaseAnnotator
 import re
 
 class BuildingTypeClassifier(BaseAnnotator):
-    # depends on properties: "buildings", "companies"
-    # f.i. living, education, ... 
-
-
     def __init__(self):
         self.writeProperty = "type"
 
@@ -15,34 +11,40 @@ class BuildingTypeClassifier(BaseAnnotator):
 
     def classify(self, object):
         types : set = set()
-        buildingType = object["properties"].get("building")
-        # TODO: extract types in enum with matching regexps
+        properties = object["properties"]
+        buildingType = properties.get("building")
+
         if object.get("abandoned") == "yes":
             types.add("abandoned")
-        elif buildingType:
-            if re.match("yes", buildingType):
-                # TODO needed here?
-                 types.add("unclassified")
-            elif re.match("apartments|terrace|house|residental|dormitory", buildingType):
-                types.add("residential")
-            elif re.match("hospital|ambulance_station", buildingType):
+        else:
+            if buildingType:
+                if re.match("apartments|terrace|house|residental|dormitory", buildingType):
+                    types.add("residential")
+                elif re.match("industrial|manufacture|warehouse|greenhouse", buildingType):
+                    types.add("industrial")
+                elif re.match("retail|shop|supermarket|service|commercial|office", buildingType):
+                    types.add("commercial")
+                elif buildingType == "public":
+                    types.add("public")
+                elif buildingType == "collapsed":
+                    types.add("abandoned")
+                elif re.match("kindergarten|school|universitary|college", buildingType) or properties.get("amenity") in ["kindergarten", "school", "universitary", "college"]:
+                    types.add("education")
+                elif re.match("hospital|ambulance_station", buildingType):
+                    types.add("health")
+                elif buildingType == "church":
+                    types.add("holy")
+            if properties.get("amenity") == "pharmacy" or properties.get("healthcare"):
                 types.add("health")
-            elif re.match("kindergarten|school|universitary", buildingType):
-                types.add("education")
-            elif re.match("industrial|manufacture|warehouse|greenhouse", buildingType):
-                types.add("industrial")
-            elif re.match("retail|shop|supermarket|service|commercial|office", buildingType):
-                types.add("commercial")
-            elif re.match("public", buildingType):
-                types.add("public admin")
-            elif re.match("collapsed", buildingType):
-                types.add("abandoned")
-            elif re.match("church", buildingType):
+            if properties.get("amenity") == "place of worship" or properties.get("religion"):
                 types.add("holy")
-        # TODO: try to companies property
-        #TODO: leisure, shop, amenity , ... 
-        #       depends on companies/restaurants being already mapped onto building
-            # TODO: health, public, food/restaurant, commerce, education, safety, public admin, ... 
+            if properties.get("office") == "government" or properties.get("government") == "register_office":
+                types.add("public admin")
+            if properties.get("amenity") in ["police", "fire_station"] or properties.get("police"):
+                types.add("safety")
+            if properties.get("leisure"):
+                types.add("leisure")
+
         return list(types)
 
     @staticmethod

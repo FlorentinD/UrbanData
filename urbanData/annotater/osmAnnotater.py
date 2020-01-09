@@ -50,7 +50,7 @@ class AddressAnnotator(OsmAnnotator):
             key = self.generateAddressKey(postalCode, street)
             addresses = {key: [houseNumber]}
         else:
-            if(object["properties"]["__nodeIds"]):
+            if(object["properties"].get("__nodeIds")):
                 addresses = self.addressesBasedOnOsmIds(object["properties"]["__nodeIds"])
             else:
                 addresses = defaultdict(list)
@@ -87,6 +87,25 @@ class AddressAnnotator(OsmAnnotator):
                     union[key].extend(value)
         return union
 
+# TODO: refactor into class
+def aggregateCategoryProperties(buildingProperties):
+    """list of entries (name, type, entrances)"""
+    entrancesPerBranch = defaultdict(int)
+    for companiesPerBuilding in buildingProperties:
+        if companiesPerBuilding:
+            for _, branch, entrances in companiesPerBuilding:
+                entrancesPerBranch[branch] += entrances
+    return entrancesPerBranch
+
+def aggregateCategoryGroupProperties(properties):
+    """like companies, education, ..."""
+    entrancesPerBranch = defaultdict(int)
+    for groupDic in properties:
+        for branch, entrances in groupDic.items():
+            entrancesPerBranch[branch] += entrances
+    return entrancesPerBranch
+
+
 class OsmCompaniesAnnotator(OsmAnnotator):
     """adds shops stores in openstreetmap"""
     # TODO: allow use crafts and companies tags
@@ -99,7 +118,7 @@ class OsmCompaniesAnnotator(OsmAnnotator):
         for shop in self.dataSource:
             # assume shops just have one entry ?? 
             properties = shop["properties"]
-            companyEntry = (properties.get("name", "No name"), properties.get("shop"), 1)
+            companyEntry = (properties.get("name", "Not named"), properties.get("shop"), 1)
             if objectGeometry.intersects(shop["geometry"]):
                 # insert into companies
                 if self.writeProperty in object["properties"].keys():
@@ -109,29 +128,17 @@ class OsmCompaniesAnnotator(OsmAnnotator):
         return object
 
     def aggregateProperties(self, buildingProperties):
-        # TODO: Duplicate from companyAnnotator and only needed if not companyAnnotator used
-        entrancesPerBranch = defaultdict(int)
-        for companiesPerBuilding in buildingProperties:
-            if companiesPerBuilding:
-                for _, branch, entrances in companiesPerBuilding:
-                    entrancesPerBranch[branch] += entrances
-            return entrancesPerBranch
+        return aggregateCategoryProperties(buildingProperties)
     
     def aggregateToRegions(self, groups, regions):
-        return self.aggregate(groups, regions, "__buildingGroups", self.aggregateGroupProperties)
-
-    def aggregateGroupProperties(self, properties):
-        entrancesPerBranch = defaultdict(int)
-        for groupDic in properties:
-            for branch, entrances in groupDic.items():
-                entrancesPerBranch[branch] += entrances
-        return entrancesPerBranch
+        return self.aggregate(groups, regions, "__buildingGroups", aggregateCategoryGroupProperties)
 
 
 class AmentiyAnnotator(OsmAnnotator):
     osmSelector = ["amenity",'"amenity"!~"vending_machine|parking|atm"', 'leisure!~"."']
-    writeProperty = "amenity"
-    # TODO split amenity into more like security and education
+    writeProperty = "amenities"
+    # TODO use building value for annotation also (extra annotator)
+    # TODO health and food also in extra category?
 
     def annotate(self, object):
         """based on geojson-object geometry checks if shop are inside of the building"""
@@ -140,44 +147,42 @@ class AmentiyAnnotator(OsmAnnotator):
         # as OSM also uses this property, but it gets reannotated
         object["properties"][self.writeProperty] = []
         for amenity in self.dataSource:
-            properties = amenity["properties"]
-            amenityEntry = (properties.get("name", "Not named"), properties.get("amenity"), 1)
             if objectGeometry.intersects(amenity["geometry"]):
-                # insert into companies
-                if self.writeProperty in object["properties"].keys():
-                    object["properties"][self.writeProperty].append(amenityEntry)
+                properties = amenity["properties"]
+                amenityType = properties.get("amenity")
+                entry = (properties.get("name", "Not named"), amenityType, 1)
+
+                if amenityType == "police":
+                    if "safety" in object["properties"].keys():
+                        object["properties"]["safety"].append(entry)
+                    else:
+                        object["properties"]["safety"] = [entry]
+                elif amenityType in ["school", "kindergarten", "university", "libary"]:
+                    if "education" in object["properties"].keys():
+                        object["properties"]["education"].append(entry)
+                    else:
+                        object["properties"]["education"] = [entry]
+                elif amenityType:
+                    object["properties"][self.writeProperty].append(entry)
+                
         return object
 
-     # Duplicate from companyAnnotator
     def aggregateProperties(self, amenities):
-        entrancesPerType = defaultdict(int)
-        for amenitiesPerBuilding in amenities:
-            if amenitiesPerBuilding:
-                for _, type, entrances in amenitiesPerBuilding:
-                    entrancesPerType[type] += entrances
-            return entrancesPerType
+        return aggregateCategoryProperties(amenities)
     
     def aggregateToRegions(self, groups, regions):
-        return self.aggregate(groups, regions, "__buildingGroups", self.aggregateGroupProperties)
-
-    def aggregateGroupProperties(self, properties):
-        """aggregating per type of leisure"""
-        entrancesPerType = defaultdict(int)
-        for groupDic in properties:
-            for type, entrances in groupDic.items():
-                entrancesPerType[type] += entrances
-        return entrancesPerType
+        return self.aggregate(groups, regions, "__buildingGroups", aggregateCategoryGroupProperties)
 
 
 class LeisureAnnotator(OsmAnnotator):
     osmSelector = ["leisure", 'amenity!~"."']
-    writeProperty = "leisure"
+    writeProperty = "leisures"
 
     def annotate(self, object):
         """based on geojson-object geometry checks if shop are inside of the building"""
         objectGeometry = shape(object["geometry"])
 
-        # as OSM also uses this property, but it gets reannotated
+        # as OSM also uses this property, but it gets re-annotated
         object["properties"][self.writeProperty] = []
         for leisure in self.dataSource:
             if objectGeometry.intersects(leisure["geometry"]):
@@ -188,26 +193,41 @@ class LeisureAnnotator(OsmAnnotator):
                     object["properties"][self.writeProperty].append(leisureEntry)
         return object
 
-    # Duplicate from companyAnnotator
     def aggregateProperties(self, leisures):
-        entrancesPerType = defaultdict(int)
-        for leisuresPerBuilding in leisures:
-            # as None is not iterable
-            if leisuresPerBuilding:
-                for _, type, entrances in leisuresPerBuilding:
-                    entrancesPerType[type] += entrances
-            return entrancesPerType
+        return aggregateCategoryProperties(leisures)
 
     def aggregateToRegions(self, groups, regions):
-        return self.aggregate(groups, regions, "__buildingGroups", self.aggregateGroupProperties)
+        return self.aggregate(groups, regions, "__buildingGroups", aggregateCategoryGroupProperties)
 
-    def aggregateGroupProperties(self, properties):
-        """aggregating per type of leisure"""
-        entrancesPerType = defaultdict(int)
-        for groupDic in properties:
-            for type, entrances in groupDic.items():
-                entrancesPerType[type] += entrances
-        return entrancesPerType
+class EducationAggregator(BaseAnnotator):
+
+    def __init__(self):
+        self.writeProperty = "education"
+
+    def annotate(self, object):
+        # already via amenity tag
+        return object
+    
+    def aggregateProperties(self, leisures):
+        return aggregateCategoryProperties(leisures)
+
+    def aggregateToRegions(self, groups, regions):
+        return self.aggregate(groups, regions, "__buildingGroups", aggregateCategoryGroupProperties)
+
+class SafetyAggregator(BaseAnnotator):
+
+    def __init__(self):
+        self.writeProperty = "safety"
+    
+    def annotate(self, object):
+        # already via amenity tag
+        return object
+    
+    def aggregateProperties(self, leisures):
+        return aggregateCategoryProperties(leisures)
+
+    def aggregateToRegions(self, groups, regions):
+        return self.aggregate(groups, regions, "__buildingGroups", aggregateCategoryGroupProperties)
 
 
 # TODO: better osmSelector ... not only building specific?

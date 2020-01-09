@@ -18,7 +18,7 @@ from helper.geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup
 from helper.geoJsonConverter import shapeGeomToGeoJson
 from helper.geoJsonHelper import unionFeatureCollections
 
-from annotater.osmAnnotater import AddressAnnotator, OsmCompaniesAnnotator, AmentiyAnnotator, LeisureAnnotator
+from annotater.osmAnnotater import AddressAnnotator, OsmCompaniesAnnotator, AmentiyAnnotator, LeisureAnnotator, EducationAggregator, SafetyAggregator
 from annotater.companyAnnotator import CompanyAnnotator
 from annotater.buildingClassifier import BuildingTypeClassifier
 from annotater.buildingLvlAnnotator import BuildingLvlAnnotator
@@ -62,7 +62,6 @@ def buildGroups(buildings):
         })
         buildingGroups.append(buildingGroup)
 
-        # TODO: move into annotator
         for bId in buildingIds:
             buildings["features"][bId]["properties"]["groupId"] = id
 
@@ -95,7 +94,7 @@ def buildRegions(buildingGroups, borders):
     added_edges = 0
     for index, bShape in buildingGroupGeoShapes:
         if((index + 1) % 50 == 0 and not index == 0):
-            logger.debug("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupGeoShapes), added_edges))
+            logger.info("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupGeoShapes), added_edges))
             added_edges = 0
     
         for otherIndex, otherBShape in buildingGroupGeoShapes[index+1:]:
@@ -132,6 +131,8 @@ def buildRegions(buildingGroups, borders):
 
         borderIndexes = set.union(*[buildingGroupGraph.node[index]['borders'] for index in indexes])
         regionBorders = [borders["features"][index]["properties"].get("name", "border{}".format(index)) for index in borderIndexes]
+        # remove duplicate street names (as streets often secmented by crossings)
+        regionBorders = list(set(regionBorders))
         groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
 
         region = shapeGeomToGeoJson(regionShape, properties={
@@ -189,7 +190,9 @@ def annotateArea(buildings, groups, regions):
 
             "companyCount": sum([entries for type, entries in group["properties"]["companies"].items()]),
             "leisureCount": sum([entries for type, entries in group["properties"]["leisures"].items()]),
-            "amenityCount": sum([entries for type, entries in group["properties"]["amenities"].items()])
+            "amenityCount": sum([entries for type, entries in group["properties"]["amenities"].items()]),
+            "educationCount": sum([entries for type, entries in group["properties"].get("education", {}).items()]),
+            "safetyCount": sum([entries for type, entries in group["properties"].get("safety", {}).items()])
         }
     
     # very alike to above loop
@@ -202,7 +205,9 @@ def annotateArea(buildings, groups, regions):
             
             "companyCount": sum([entries for type, entries in region["properties"]["companies"].items()]),
             "leisureCount": sum([entries for type, entries in region["properties"]["leisures"].items()]),
-            "amenityCount": sum([entries for type, entries in region["properties"]["amenities"].items()])
+            "amenityCount": sum([entries for type, entries in region["properties"]["amenities"].items()]),
+            "educationCount": sum([entries for type, entries in region["properties"]["education"].items()]),
+            "safetyCount": sum([entries for type, entries in region["properties"]["safety"].items()])
         }
     return (buildings, groups, regions)
 
@@ -237,6 +242,7 @@ if __name__ == "__main__":
         groups, regions = buildGroupsAndRegions(buildings, borders)
     else:
         logger.info("Loading buildings, groups and regions")
+        # TODO: index seems to be messed up when loading?
         with open("out/data/buildings_pieschen.json", encoding='UTF-8') as file:
             buildings = json.load(file)
         with open("out/data/buildingGroups_pieschen.json", encoding='UTF-8') as file:
@@ -252,9 +258,11 @@ if __name__ == "__main__":
     
     # TODO: clarify dependencies between them
     annotater = [AddressAnnotator(areaOfInterest), BuildingLvlAnnotator(), CompanyAnnotator(),
-                 BuildingTypeClassifier(), OsmCompaniesAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE),
-                 LeisureAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), AmentiyAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE)]
-    
+                 BuildingTypeClassifier(), OsmCompaniesAnnotator(
+                     areaOfInterest, OsmObjectType.WAYANDNODE),
+                 LeisureAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), AmentiyAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), 
+                 SafetyAggregator(), EducationAggregator()]
+
     for annotator in annotater:
         logger.info("Starting {}".format(annotator.__class__.__name__))
         buildings = annotator.annotateAll(buildings)
@@ -266,7 +274,7 @@ if __name__ == "__main__":
     logger.info("save complexes and regions")
 
     with open("out/data/buildings_pieschen.json", 'w', encoding='UTF-8') as outfile:
-            geojson.dump(groups, outfile)
+            geojson.dump(buildings, outfile)
     with open("out/data/buildingGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(groups, outfile)
     with open("out/data/buildingRegions_pieschen.json", 'w', encoding='UTF-8') as outfile:
@@ -279,9 +287,6 @@ if __name__ == "__main__":
     pieschenCoord = pieschen.toJSON()[0]
     map = folium.Map(
         location=[51.088534,13.723315], tiles='Open Street Map', zoom_start=15)
-
-    #if VISUALIZE_EDGES:
-    #    edges.add_to(map)
 
     geoFeatureCollectionToFoliumFeatureGroup(buildings, "black", name="Single buildings").add_to(map)
 

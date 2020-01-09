@@ -109,7 +109,7 @@ class CompanyAnnotator(BaseAnnotator):
             if companiesPerBuilding:
                 for _, branch, entrances in companiesPerBuilding:
                     entrancesPerBranch[branch] += entrances
-            return entrancesPerBranch
+        return entrancesPerBranch
     
     def aggregateToRegions(self, groups, regions):
         return self.aggregate(groups, regions, "__buildingGroups", self.aggregateGroupProperties)
