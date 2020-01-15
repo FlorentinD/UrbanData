@@ -23,8 +23,8 @@ def styleFunction(colorMap, property: str):
 
 def collapseSubLayers(groupColorMap, groupsCount):
     """ generaters HTML to show in layer control """
-    layerDescription = [enhanceFeatureName(name, color, groupsCount[name]) for name, color in groupColorMap.items()]
-    return '\n'.join(layerDescription)
+    layerDescription = ["<br> &nbsp;&nbsp;&nbsp;&nbsp;" + enhanceFeatureName(name, color, groupsCount[name]) for name, color in groupColorMap.items()]
+    return ''.join(layerDescription)
 
 
 def enhanceFeatureName(name, color, count) -> str:
@@ -45,7 +45,7 @@ def escapePropertyValue(value):
                 value.insert(i * itemsPerLine, "<br>")
         return [escapePropertyValue(v) for v in value]
     if isinstance(value, dict):
-        return "<br>".join(["&nbsp;&nbsp; {}: {}".format(k,v) for k, v in value.items()])
+        return "".join(["<br> &nbsp;&nbsp; {}: {}".format(k, escapePropertyValue(v)) for k, v in value.items() if v])
     else:
         return value
 
@@ -114,7 +114,7 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
         #         layer.add_to(featureCollection)
     return featureCollection
 
-def generateFeatureCollection(groups, colormapName: str, featureName: str):
+def generateFeatureCollectionForGroups(groups, colormapName: str, featureName: str):
     """groups: dictoniary with geojson.FeatureCollections as values"""
 
     colormap = matplotlib.cm.get_cmap(name=colormapName, lut=len(groups))
@@ -126,8 +126,6 @@ def generateFeatureCollection(groups, colormapName: str, featureName: str):
 
     name = featureName
 
-    layer = folium.FeatureGroup(name = name)
-
     # TODO: move into collapseSubLayers
     if len(groups.items()) > 1:
         groupsCount = {name: len(group["features"])
@@ -135,7 +133,8 @@ def generateFeatureCollection(groups, colormapName: str, featureName: str):
         name += collapseSubLayers(groupColorMap, groupsCount)
     else:
         name += "({})".format((len(list(groups.values())[0]["features"])))
-    
+
+    layer = folium.FeatureGroup(name = name)
     for type, group in groups.items():
         color = groupColorMap[type]
         featureGroup = geoFeatureCollectionToFoliumFeatureGroup(group, color, type)
