@@ -152,7 +152,7 @@ class AmentiyAnnotator(OsmAnnotator):
                 amenityType = properties.get("amenity")
                 entry = (properties.get("name", "Not named"), amenityType, 1)
 
-                if amenityType == "police":
+                if amenityType in ["police", "fire_station"]:
                     if "safety" in object["properties"].keys():
                         object["properties"]["safety"].append(entry)
                     else:
@@ -205,7 +205,15 @@ class EducationAggregator(BaseAnnotator):
         self.writeProperty = "education"
 
     def annotate(self, object):
-        # already via amenity tag
+        properties = object["properties"]
+        buildingType = properties.get("building")
+        # could already be annotated via amenity tag
+        if buildingType in ["school", "kindergarten", "university", "libary"] and not properties.get("amenity"):
+            entry = (properties.get("name", "Not named"), buildingType, 1)
+            if "education" in properties.keys():
+                object["properties"]["education"].append(entry)
+            else:
+                object["properties"]["education"] = [entry]
         return object
     
     def aggregateProperties(self, leisures):
@@ -220,7 +228,15 @@ class SafetyAggregator(BaseAnnotator):
         self.writeProperty = "safety"
     
     def annotate(self, object):
-        # already via amenity tag
+        properties = object["properties"]
+        buildingType = properties.get("building")
+        # could already be annotated via amenity tag
+        if buildingType in ["police", "fire_station"] and not properties.get("amenity"):
+            entry = (properties.get("name", "Not named"), buildingType, 1)
+            if "safety" in properties.keys():
+                object["properties"]["safety"].append(entry)
+            else:
+                object["properties"]["safety"] = [entry]
         return object
     
     def aggregateProperties(self, leisures):
