@@ -4,4 +4,4 @@ class OsmObjectType(Enum):
     WAY = "way"
     NODE = "node"
     WAYANDNODE = ["way", "node"]
-    RELATIONSHIP = "relationship"
+    RELATIONSHIP = "rel"
