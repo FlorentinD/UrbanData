@@ -12,13 +12,30 @@ def groupBy(featureCollection, properties):
         properties = [properties]
     for row in features:
         groupByValue = []
-        [groupByValue.append(row["properties"][prop]) for prop in properties]
+        [groupByValue.append(row["properties"].get(prop,"")) for prop in properties]
         groupByValue = "|".join(groupByValue)
         if not groupByValue in groups:
             groups[groupByValue] = [row]
         else:
             groups[groupByValue].append(row)
     return {key: geojson.FeatureCollection(group) for key, group in groups.items()}
+
+def centerPoint(featureCollection):
+    """returns the center for a group of points"""
+    features = featureCollection["features"]
+    center = [0, 0]
+    for feature in features:
+        geometry = feature["geometry"]
+        if geometry["type"] == "Point":
+            point = feature["geometry"]["coordinates"]
+            center[0] += point[0]
+            center[1] += point[1]
+        else:
+            raise ValueError("expected a point but got a {}".format(geometry["type"]))
+    center[0] /= len(features) 
+    center[1] /= len(features) 
+
+    return geojson.Point(coordinates=center)
 
 
 def unionFeatureCollections(*collections):
@@ -31,6 +48,8 @@ def unionFeatureCollections(*collections):
             features.append(collection)
     return geojson.FeatureCollection(features)
 
+
+# TODO: distinct feature union (by osm id)
 
 def getSchema(featureCollection, amount:int=10):
     """retrieve the top X properties used in given gejson feature collection"""
