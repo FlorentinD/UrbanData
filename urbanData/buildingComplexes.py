@@ -65,7 +65,7 @@ def buildGroups(buildings):
         for bId in buildingIds:
             buildings["features"][bId]["properties"]["groupId"] = id
 
-    logger.info("BuildingGroups: {}".format(len(buildingGroups)))
+    logging.info("BuildingGroups: {}".format(len(buildingGroups)))
 
     return geojson.FeatureCollection(buildingGroups)
 
@@ -94,7 +94,7 @@ def buildRegions(buildingGroups, borders):
     added_edges = 0
     for index, bShape in buildingGroupGeoShapes:
         if((index + 1) % 50 == 0 and not index == 0):
-            logger.info("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupGeoShapes), added_edges))
+            logging.info("Progress: {}/{} ; {} edges added".format(index + 1, len(buildingGroupGeoShapes), added_edges))
             added_edges = 0
     
         for otherIndex, otherBShape in buildingGroupGeoShapes[index+1:]:
@@ -145,7 +145,7 @@ def buildRegions(buildingGroups, borders):
         for group in groupsForRegion:
             group["properties"]["regionId"] = id 
 
-    logger.info("Building Regions: {}".format(len(buildingRegions)))
+    logging.info("Building Regions: {}".format(len(buildingRegions)))
     return geojson.FeatureCollection(buildingRegions)
 
 def buildGroupsAndRegions(buildings, borders):
@@ -162,7 +162,7 @@ def annotateArea(buildings, groups, regions):
     """based on number of levels of buildings"""
     BUILDINGAREA_KEY = "buildingArea"
     # TODO: rewrite as annotater
-    logger.info("Starting area annotation")
+    logging.info("Starting area annotation")
     for building in buildings["features"]:
         buildingLevels = building["properties"].get("levels")
         groundArea = getPolygonArea(shape(building["geometry"]))
@@ -212,9 +212,7 @@ def annotateArea(buildings, groups, regions):
     return (buildings, groups, regions)
 
 
-
-logger = logging.getLogger('')
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 if __name__ == "__main__":
     areaOfInterest = 'Pieschen, Dresden, Germany'
@@ -238,10 +236,10 @@ if __name__ == "__main__":
         # Poor Mans Testing
         #buildings = geojson.FeatureCollection(buildings["features"][:200])
 
-        logger.info("Fetched {} buildings".format(len(buildings["features"])))
+        logging.info("Fetched {} buildings".format(len(buildings["features"])))
         groups, regions = buildGroupsAndRegions(buildings, borders)
     else:
-        logger.info("Loading buildings, groups and regions")
+        logging.info("Loading buildings, groups and regions")
         # TODO: index seems to be messed up when loading?
         with open("out/data/buildings_pieschen.json", encoding='UTF-8') as file:
             buildings = json.load(file)
@@ -264,14 +262,14 @@ if __name__ == "__main__":
                  SafetyAggregator(), EducationAggregator()]
 
     for annotator in annotater:
-        logger.info("Starting {}".format(annotator.__class__.__name__))
+        logging.info("Starting {}".format(annotator.__class__.__name__))
         buildings = annotator.annotateAll(buildings)
         groups = annotator.aggregateToGroups(buildings, groups)
         regions = annotator.aggregateToRegions(groups, regions)
     
     annotateArea(buildings, groups, regions)
 
-    logger.info("save complexes and regions")
+    logging.info("save complexes and regions")
 
     with open("out/data/buildings_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(buildings, outfile)
@@ -286,7 +284,7 @@ if __name__ == "__main__":
     pieschen = Nominatim().query(areaOfInterest)
     pieschenCoord = pieschen.toJSON()[0]
     map = folium.Map(
-        location=[51.088534,13.723315], tiles='Open Street Map', zoom_start=15)
+        location=[51.078875, 13.728524], tiles='Open Street Map', zoom_start=15)
 
     geoFeatureCollectionToFoliumFeatureGroup(buildings, "black", name="Single buildings").add_to(map)
 
@@ -303,4 +301,4 @@ if __name__ == "__main__":
 
     fileName = "out/maps/buildingComplexes_{}.html".format(areaName)
     map.save(fileName)
-    logger.info("Map saved in {}".format(fileName))
+    logging.info("Map saved in {}".format(fileName))
