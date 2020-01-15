@@ -7,7 +7,7 @@ from matplotlib import cm
 import sys, os
 sys.path.insert(1, os.path.abspath('..'))
 from helper.geoJsonHelper import groupBy
-from helper.geoJsonToFolium import generateFeatureCollection, styleFunction, cmMapColorToHex
+from helper.geoJsonToFolium import generateFeatureCollectionForGroups, styleFunction, cmMapColorToHex
 from helper.overPassHelper import OverPassHelper
 
 # postfix for f.i. file_names
@@ -30,7 +30,7 @@ for i, osmQuery in enumerate(osmDataFiles):
     allObjects = json.load(file)
     objectGroups = groupBy(allObjects, osmQuery.groupByProperty)
 
-    objectMap = generateFeatureCollection(objectGroups, colormaps[i % len(colormaps)], osmQuery.name)
+    objectMap = generateFeatureCollectionForGroups(objectGroups, colormaps[i % len(colormaps)], osmQuery.name)
     objectMap.add_to(map)
 
 folium.LayerControl().add_to(map)
