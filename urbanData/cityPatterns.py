@@ -17,10 +17,10 @@ pieschenAreaId = overpassFetcher.getAreaId("Dresden, Germany")
 map = Map(location=[51.078875, 13.728524], tiles='Open Street Map', zoom_start=15)
 
 # TODO: get boundary of area
-""" boundary = next(overpassFetcher.directFetch(pieschenAreaId, [OsmDataQuery(
-    "Area boundaries", OsmObjectType.RELATIONSHIP, ['"boundary"~"administrative"', '"name"~"Pieschen"'])]))
+boundary = next(overpassFetcher.directFetch(pieschenAreaId, [OsmDataQuery(
+    "Area boundaries", OsmObjectType.RELATIONSHIP, ['"boundary"~"administrative"', '"name"="Pieschen"'])]))
 geoFeatureCollectionToFoliumFeatureGroup(
-    boundary, 'grey', "Area boundary").add_to(map) """
+    boundary, 'grey', "Area boundary").add_to(map)
 
 # (16) Public transport (https://docs.traveltimeplatform.com/reference/time-map)
 

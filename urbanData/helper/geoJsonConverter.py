@@ -5,12 +5,18 @@ def osmObjectsToGeoJSON(osmObjects):
     """given a list osm-objects as json (! in geom out-format!)"""
     features = []
     for object in osmObjects:
-        geometry = osmToGeoJsonGeometry(object)
+        type = object["type"]
         properties = object["tags"]
-        if object["type"] == "way":
-            properties["__nodeIds"] = object["nodes"]
-        elif object["type"] == "node":
-            properties["__nodeId"] = object["id"]
+        if type == "relation":
+            relMembers = object["members"]
+            memberGeometries = [osmToGeoJsonGeometry(m) for m in relMembers]
+            geometry = geojson.MultiLineString(coordinates=memberGeometries)
+        else:
+            geometry = osmToGeoJsonGeometry(object)
+            if type == "way":
+                properties["__nodeIds"] = object["nodes"]
+            elif type == "node":
+                properties["__nodeId"] = object["id"]
         feature = geojson.Feature(
             id=object["id"], geometry=geometry, properties=properties)
         features.append(feature)
@@ -32,7 +38,7 @@ def osmToGeoJsonGeometry(object):
         raise ValueError('osm object has no geometry key {}'.format(object))
     if len(points) > 1:
         polygonKeys = ["building", "landuse", "area"]
-        if(set(object["tags"].keys()).intersection(polygonKeys)):
+        if(set(object.get("tags",{}).keys()).intersection(polygonKeys)):
             polygon = geojson.Polygon([points])
             if polygon.errors():
                 print("Could not convert to a polygon {}".format(object))
