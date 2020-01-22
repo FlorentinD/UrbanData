@@ -2,7 +2,7 @@ import numpy as np
 import geojson
 import matplotlib.pyplot as plt
 import logging
-from shapely.geometry import MultiPoint, Point, Polygon, mapping
+from shapely.geometry import MultiPoint, Point, Polygon, mapping, shape
 from scipy.spatial import Voronoi
 
 def voronoi_finite_polygons_2d(vor, radius=None):
@@ -92,22 +92,22 @@ def voronoi_finite_polygons_2d(vor, radius=None):
 def voronoiFeatureCollection(points):
     """
         creates a Voronoi diagram as a geojson feature collection
-        points: geojson-featureCollection (features must be points!) 
+        points: geojson-featureCollection (features must be points or polygon!) 
         
         returns a geojsonFeatureCollection
     """
     features = points["features"]
     points = []
     for feature in features:
+        # retrieve point coord from point feature (could be refactored in geojson helper function)
         geometry = feature["geometry"]
         if geometry["type"] == "Point":
-            points.append(feature["geometry"]["coordinates"])
+            points.append(geometry["coordinates"])
         elif geometry["type"] == "Polygon" or geometry["type"] == "LineString":
-            # TODO: get center via shapely for this case 
-            logging.error("ignored Polygon {}".format(feature))
+            centerPoint = shape(geometry).centroid.coords[0]
+            points.append(centerPoint)
         else:
-            raise ValueError("expected a point but got a {}".format(geometry["type"]))
-    # retrieve point coord from point feature (could be refactored in geojson helper function)
+            raise ValueError("expected a point or polygon but got a {}".format(geometry["type"]))
     vor = Voronoi(points)
     regions, vertices = voronoi_finite_polygons_2d(vor)
     pts = MultiPoint([Point(i) for i in points])
@@ -115,8 +115,8 @@ def voronoiFeatureCollection(points):
     mask = pts.convex_hull
     for region in regions:
         polygon = vertices[region]
-        shape = list(polygon.shape)
-        shape[0] += 1
-        p = Polygon(np.append(polygon, polygon[0]).reshape(*shape)).intersection(mask)
+        shapes = list(polygon.shape)
+        shapes[0] += 1
+        p = Polygon(np.append(polygon, polygon[0]).reshape(*shapes)).intersection(mask)
         features.append(geojson.Feature(geometry=mapping(p)))
     return geojson.FeatureCollection(features)
