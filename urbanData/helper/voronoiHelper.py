@@ -89,30 +89,31 @@ def voronoi_finite_polygons_2d(vor, radius=None):
 
     return new_regions, np.asarray(new_vertices)
 
-def voronoiFeatureCollection(points):
+def voronoiFeatureCollection(points, mask = None):
     """
         creates a Voronoi diagram as a geojson feature collection
-        points: geojson-featureCollection (features must be points or polygon!) 
-        
+        points: geojson-featureCollection (features must be points else the center of the geometry is used) 
+        mask: border for voroinoi areas (defaults to convex hull of points)
         returns a geojsonFeatureCollection
     """
     features = points["features"]
     points = []
     for feature in features:
-        # retrieve point coord from point feature (could be refactored in geojson helper function)
         geometry = feature["geometry"]
         if geometry["type"] == "Point":
             points.append(geometry["coordinates"])
-        elif geometry["type"] == "Polygon" or geometry["type"] == "LineString":
+        else:
             centerPoint = shape(geometry).centroid.coords[0]
             points.append(centerPoint)
-        else:
-            raise ValueError("expected a point or polygon but got a {}".format(geometry["type"]))
     vor = Voronoi(points)
     regions, vertices = voronoi_finite_polygons_2d(vor)
     pts = MultiPoint([Point(i) for i in points])
     # TODO: this could be later replaced by border of dresden
-    mask = pts.convex_hull
+    if not mask:
+        mask = pts.convex_hull
+    else:
+        # convex_hull as f.i. linestring borders would result in a GeometryCollection which was not mappable to folium
+        mask = shape(mask["geometry"]).convex_hull
     for region in regions:
         polygon = vertices[region]
         shapes = list(polygon.shape)
