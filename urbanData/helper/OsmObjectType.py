@@ -5,3 +5,4 @@ class OsmObjectType(Enum):
     NODE = "node"
     WAYANDNODE = ["way", "node"]
     RELATIONSHIP = "rel"
+    ALL = ["way", "node", "rel"]
