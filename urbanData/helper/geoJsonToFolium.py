@@ -58,6 +58,9 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
     for feature in geoFeatureCollection["features"]:
             geom = feature["geometry"]
             describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items() if not k.startswith("__") and v])
+            if not describtion:
+                # set to None if empty string (default for folium tooltip parameter)
+                describtion = None
             if geom["type"] == "Point":
                 loc = geom["coordinates"]
                 if switchLatAndLong:
