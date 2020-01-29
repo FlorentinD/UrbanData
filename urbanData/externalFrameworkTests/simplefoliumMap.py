@@ -21,6 +21,14 @@ streetMap = folium.Map(
     location=piescheonCoord, tiles='Stamen Toner', zoom_start=15)
 
 
+icon = folium.Icon(icon="pills", color='lightgray', icon_color = 'red')
+
+folium.Marker(
+                        location=piescheonCoord,
+                        tooltip="test",
+                        icon=icon
+                    ).add_to(streetMap)
+
 for type, streets in street_types.items():
     properties = list(streets["features"][0]["properties"].keys())
     folium.GeoJson(
@@ -32,4 +40,4 @@ for type, streets in street_types.items():
     ).add_to(streetMap)
     
 folium.LayerControl().add_to(streetMap)
-streetMap.save("out/maps/streetmap.html")
+streetMap.save("../out/maps/streetmap.html")
