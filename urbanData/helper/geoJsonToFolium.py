@@ -1,8 +1,10 @@
 import json
 import folium
 from folium.plugins.measure_control import MeasureControl
+from folium.plugins import FeatureGroupSubGroup
 import re
 import matplotlib
+import logging
 
 from helper.geoJsonHelper import groupBy, getSchema
 from helper.OsmDataQuery import OsmDataQuery
@@ -49,11 +51,16 @@ def escapePropertyValue(value):
     else:
         return value
 
-def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, switchLatAndLong = True):
-    """from geojson feature collection to folium feature group"""
+def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, switchLatAndLong = True, icon = None, show = True):
+    """from geojson feature collection to folium feature group
+
+        icon: name of the marker sign based on https://fontawesome.com/icons (only for points?)
+    """
+
     name = enhanceFeatureName(name, color, len(geoFeatureCollection["features"]))
-    featureCollection = folium.FeatureGroup(name = name)
-    
+    featureCollection = folium.FeatureGroup(name = name, show = show)
+
+    # TODO: try MarkerCluster if atleast one point
     # Self mapped as geojson layer not fully functional yet (open PRs)
     for feature in geoFeatureCollection["features"]:
             geom = feature["geometry"]
@@ -67,11 +74,19 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                     point = (loc[1], loc[0])
                 else:
                     point = (loc[0], loc[1])
-                folium.vector_layers.CircleMarker(
-                    location=point, 
-                    radius=3, 
-                    tooltip=describtion, 
-                    color=color).add_to(featureCollection)
+                if icon:
+                    folium.Marker(
+                        location=point,
+                        tooltip=describtion,
+                        icon=icon
+                    ).add_to(featureCollection)
+                else:
+                    folium.vector_layers.CircleMarker(
+                        location=point,
+                        radius=3,
+                        tooltip=describtion,
+                        color=color,
+                        icon=icon).add_to(featureCollection)
             elif geom["type"] == "LineString":
                 if switchLatAndLong:
                     loc = [(point[1], point[0])
@@ -82,10 +97,10 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                     loc, 
                     color=color, 
                     tooltip=describtion).add_to(featureCollection)
-            elif geom["type"] in ['MultiLineString', "Polygon"]:
+            elif geom["type"] == 'MultiLineString':
                 loc = []
-                for lines in geom["coordinates"]:
-                    for lon, lat in lines:
+                for line in geom["coordinates"]:
+                    for lon, lat in line:
                         if switchLatAndLong:
                             loc.append((lat, lon))
                         else:
@@ -95,15 +110,35 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                     tooltip=describtion, 
                     color=color, 
                     fill_color=color).add_to(featureCollection)
-            elif geom["type"] == "MultiPolygon":
+            elif geom["type"] == 'Polygon':
+                lines = geom["coordinates"]
+                if len(lines) > 1:
+                    logging.debug("Folium does not support holes in Polygon -> just exterior line")
+
                 loc = []
+                for lon, lat in lines[0]:
+                        if switchLatAndLong:
+                            loc.append((lat, lon))
+                        else:
+                            loc.append((lon, lat))
+
+                folium.vector_layers.Polygon(
+                    loc, 
+                    tooltip=describtion, 
+                    color=color, 
+                    fill_color=color).add_to(featureCollection)
+
+            elif geom["type"] == "MultiPolygon":
+                raise ValueError("Folium does not support MultiPolygons")
+                """ loc = []
+                # TODO: rewrite MultiPolygon into multiple Polygon objects?
                 for polygon in geom["coordinates"]:
                     for lines in polygon:
                         if switchLatAndLong:
                             [loc.append((lat, lon)) for point in lines]
                         else:
                           [loc.append((lon, lat)) for point in lines]  
-                folium.vector_layers.Polygon(loc, tooltip=describtion, color=color, fill_color=color).add_to(featureCollection)
+                folium.vector_layers.Polygon(loc, tooltip=describtion, color=color, fill_color=color).add_to(featureCollection) """
             else:
                 raise ValueError("{} not mapped onto folium object yet".format(geom["type"]))
         #  layer = folium.GeoJson(
@@ -117,7 +152,7 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
         #         layer.add_to(featureCollection)
     return featureCollection
 
-def generateFeatureCollectionForGroups(groups, colormapName: str, featureName: str):
+def generateFeatureCollectionForGroups(groups, colormapName: str, featureName: str, iconMap = {}, show = True):
     """groups: dictoniary with geojson.FeatureCollections as values"""
 
     colormap = matplotlib.cm.get_cmap(name=colormapName, lut=len(groups))
@@ -140,6 +175,6 @@ def generateFeatureCollectionForGroups(groups, colormapName: str, featureName: s
     layer = folium.FeatureGroup(name = name)
     for type, group in groups.items():
         color = groupColorMap[type]
-        featureGroup = geoFeatureCollectionToFoliumFeatureGroup(group, color, type)
+        featureGroup = geoFeatureCollectionToFoliumFeatureGroup(group, color, type, show = show, icon=iconMap.get(type, None))
         featureGroup.add_to(layer)
     return layer
