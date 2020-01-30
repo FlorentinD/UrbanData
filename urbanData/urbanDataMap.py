@@ -5,7 +5,7 @@ from OSMPythonTools.nominatim import Nominatim
 from folium.plugins.measure_control import MeasureControl
 
 from helper.geoJsonHelper import groupBy
-from helper.geoJsonToFolium import generateFeatureCollection
+from helper.geoJsonToFolium import generateFeatureCollectionForGroups
 from helper.overPassHelper import OverPassHelper
 from helper.OsmObjectType import OsmObjectType as OsmObject
 from helper.OsmDataQuery import OsmDataQuery
@@ -74,7 +74,7 @@ for i, osmDataQuery in enumerate(osmDataFiles):
     allObjects = json.load(file)
     objectGroups = groupBy(allObjects, osmDataQuery.groupByProperty)
 
-    objectMap = generateFeatureCollection(
+    objectMap = generateFeatureCollectionForGroups(
         objectGroups, colormaps[i % len(colormaps)], osmDataQuery.name)
     objectMap.add_to(map)
 
