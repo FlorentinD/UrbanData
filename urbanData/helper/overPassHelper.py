@@ -57,8 +57,10 @@ class OverPassHelper:
                 self.saveGeoJson(file, geoJsonObjects)
         return osmQueries
     
-    def directFetch(self, areaId, osmQueries: List[OsmDataQuery] = None) -> List:
+    def directFetch(self, areaId, osmQueries = None) -> List:
         """returns list of geojson featurecollections"""
+        if isinstance(osmQueries, OsmDataQuery):
+            osmQueries = [osmQueries]
         for query in osmQueries:
           osmObjects = self.getOsmGeoObjects(areaId, query.osmSelector, query.osmObject)  
           yield osmObjectsToGeoJSON(osmObjects)

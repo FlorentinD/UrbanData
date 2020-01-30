@@ -54,6 +54,9 @@ def osmToGeoJsonGeometry(object):
         return geojson.Point(points[0], validate=True)
 
 def tryToConvertToPolygon(tags, lines):
+    # as sometimes tags like "area":"no" exists, which are obviously no polygons
+    tags = {tag: v for tag, v in tags.items() if not v == "no"}
+
     # osm-multipolygon: means just as complex area ... but geojson polygons can also handle holes
     if POLYGON_TAGS.intersection(tags) or tags.get("type") == "multipolygon": 
         polygon = geojson.Polygon(lines)
