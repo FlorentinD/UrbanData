@@ -3,6 +3,7 @@ import geojson
 import matplotlib.pyplot as plt
 import logging
 from shapely.geometry import MultiPoint, Point, Polygon, mapping, shape
+from shapely.ops import polygonize
 from scipy.spatial import Voronoi
 
 def voronoi_finite_polygons_2d(vor, radius=None):
@@ -112,12 +113,28 @@ def voronoiFeatureCollection(points, mask = None):
     if not mask:
         mask = pts.convex_hull
     else:
-        # convex_hull as f.i. linestring borders would result in a GeometryCollection which was not mappable to folium
-        mask = shape(mask["geometry"]).convex_hull
+        mask = shape(mask["geometry"])
+        if not isinstance(mask, Polygon):
+            maskPolygons = list(polygonize(mask))
+            if len(maskPolygons) == 1:
+                mask = maskPolygons[0]
+            else:
+                # Fallback if not one polygon could be generated
+                # otherwise a GeometryCollection would result ... probably
+                mask = mask.convex_hull
     for region in regions:
         polygon = vertices[region]
         shapes = list(polygon.shape)
         shapes[0] += 1
         p = Polygon(np.append(polygon, polygon[0]).reshape(*shapes)).intersection(mask)
-        features.append(geojson.Feature(geometry=mapping(p)))
+        if p.geom_type == "MultiPolygon":
+            polygons = list(p)
+            for poly in polygons:
+                geoJsonGeom = mapping(poly)
+                features.append(geojson.Feature(geometry=geoJsonGeom))
+        else: 
+            geoJsonGeom = mapping(p)
+            if not geoJsonGeom["type"] == 'Polygon':
+                raise ValueError("Voronoi area should be a polygon but got {}".format(geoJsonGeom["type"]))
+        features.append(geojson.Feature(geometry=geoJsonGeom))
     return geojson.FeatureCollection(features)
