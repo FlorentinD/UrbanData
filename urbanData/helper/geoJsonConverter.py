@@ -1,9 +1,10 @@
 import geojson
 import logging
 from shapely.geometry import mapping
+import networkx as nx
 
-POLYGON_TAGS = ["building", "landuse", "area"]
-LINESTRING_TAGS = ["boundary"]
+POLYGON_TAGS = set(["building", "landuse", "area"])
+LINESTRING_TAGS = set(["boundary"])
 
 def osmObjectsToGeoJSON(osmObjects):
     """given a list osm-objects as json (! in geom out-format!)"""
@@ -28,50 +29,66 @@ def osmObjectsToGeoJSON(osmObjects):
 
 def osmToGeoJsonGeometry(object):
     if object["type"] == "relation":
-            # Todo tag based
-            # TODO: use type:multipolygon
             relMembers = object["members"]
             outerGeometries = [osmToGeoJsonGeometry(m) for m in relMembers if m['role'] in ["outer",'']]
+            # members are unordered, thus for a boundary we need to order them
+            exteriorLine = transformToBoundaryLine(outerGeometries)
+            if exteriorLine:
+                outerGeometries = [exteriorLine]
             innerGeometries = [osmToGeoJsonGeometry(m) for m in relMembers if m['role'] == "inner"]    
             coordinates = outerGeometries + innerGeometries
-            # TODO: Order members (as they can be unsorted) probably inverted index usabel for order? 
-            # (or graph algo ... longest path probably / try finding a euler-zug)
             return tryToConvertToPolygon(object.get("tags",{}), coordinates)
-    elif "geometry" in object:
+    elif object["type"] == "way":
         points = [[pos["lon"], pos["lat"]] for pos in object["geometry"]]
-    elif "lon" in object and "lat" in object:
+    elif object["type"] == "node":
         points = [[object["lon"], object["lat"]]]
     else:
-        raise ValueError("{} contains no geometry or lon/lat data".format(object))
+        raise ValueError("{} neither node, way or rel conform geometry".format(object))
     if points is None:
-        raise ValueError('osm object has no geometry key {}'.format(object))
+        raise ValueError('osm object has no geometry {}'.format(object))
     if len(points) > 1:
-        return tryToConvertToPolygon(object.get("tags",{}), points)
+        # [points] as ways can only be a simple line
+        return tryToConvertToPolygon(object.get("tags",{}), [points])
     else:
         assert(len(points) == 1)
         return geojson.Point(points[0], validate=True)
 
-def tryToConvertToPolygon(tags, points):
-    tagsKeys = set(tags.keys())
+def tryToConvertToPolygon(tags, lines):
     # osm-multipolygon: means just as complex area ... but geojson polygons can also handle holes
-    if tagsKeys.intersection(POLYGON_TAGS) or tags.get("type") == "multipolygon":
-        if tags.get("type") == "multipolygon":
-            # due to coming already in right format
-            polygon = geojson.Polygon(points)
-        else:
-            # [points] as this is the outer linestring of the polygon (no holes in osm, if not specified) 
-            polygon = geojson.Polygon([points])
+    if POLYGON_TAGS.intersection(tags) or tags.get("type") == "multipolygon": 
+        polygon = geojson.Polygon(lines)
         if not polygon.errors():
             return polygon
         else:
             logging.debug("Could not be converted to a polygon with tags {}".format(tags))
-    line = geojson.LineString(points)
-    if not line.errors():
-        return line
+    if len(lines) == 1:
+        return geojson.LineString(lines[0], validate=True)
     else:
-        if tagsKeys.intersection(LINESTRING_TAGS):
-            logging.debug("Could not be converted to a linestring with tags {}".format(tags))
-        return geojson.MultiLineString(points, validate=True)
+        if LINESTRING_TAGS.intersection(tags):
+            logging.debug("To many lines for a simple line for object with tags: {}".format(tags))
+        return geojson.MultiLineString(lines, validate=True)
+
+def transformToBoundaryLine(lines):
+    """
+        tries to find an euler circuit based on all lines
+    """
+    graph = nx.Graph()
+    for line in lines:
+        points = [tuple(p)  for p in line["coordinates"]]
+        for p in points:
+            graph.add_node(p)
+        for start, end in zip(points, points[1:]): 
+            graph.add_edge(start, end)
+    try:
+        edges = list(nx.eulerian_circuit(graph))
+        startpoint = edges[0][0]
+        points = [start for start, end in edges]
+        # add startpoint, as polygon rings have to end, where they started
+        points.append(startpoint)
+        return points
+    except nx.NetworkXError:
+        logging.debug("Boundary line was not an euler train")
+        return None
 
 def shapeGeomToGeoJson(shape, properties = None):
     geometry = mapping(shape)
