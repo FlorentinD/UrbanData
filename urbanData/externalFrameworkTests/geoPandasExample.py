@@ -20,7 +20,7 @@ plot = highWayFrame.plot(column='highway', legend=True)
 plt.show()
 
 
-buildingsFrame = geopandas.read_file("out/data/buildings_pieschen.json")
+buildingsFrame = geopandas.read_file("out/data/geoPandas_Example.json")
 print(buildingsFrame.size)
 print(buildingsFrame.keys())
 plot2 = buildingsFrame.plot(column='building', legend=True)
