@@ -6,7 +6,7 @@ import geojson
 import folium
 import networkx as nx
 
-import pyproj
+
 from shapely.geometry import Polygon, LineString, mapping, shape
 from shapely.ops import unary_union, transform
 from OSMPythonTools.nominatim import Nominatim
@@ -17,6 +17,7 @@ from helper.OsmObjectType import OsmObjectType
 from helper.geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup
 from helper.geoJsonConverter import shapeGeomToGeoJson
 from helper.geoJsonHelper import unionFeatureCollections
+from helper.coordSystemHelper import transformWgsToUtm as withUTMCoord
 
 from annotater.osmAnnotater import AddressAnnotator, OsmCompaniesAnnotator, AmentiyAnnotator, LeisureAnnotator, EducationAggregator, SafetyAggregator
 from annotater.companyAnnotator import CompanyAnnotator
@@ -68,11 +69,6 @@ def buildGroups(buildings):
     logging.info("BuildingGroups: {}".format(len(buildingGroups)))
 
     return geojson.FeatureCollection(buildingGroups)
-
-def withUTMCoord(building):
-     # TODO: derive Zone from coordinates (center)
-    project = pyproj.Proj(proj='utm', zone=33, ellps='WGS84', preserve_units = False)
-    return transform(project, building)
 
 def buildRegions(buildingGroups, borders):
     """buildingGroup expansion (if no borders inbetween -> union)"""
