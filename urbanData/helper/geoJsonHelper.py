@@ -1,23 +1,25 @@
 import geojson
+from collections import defaultdict
+from typing import Callable
 
 # TODO: wrapper methods access on geojson objects (avoid direct dict access via "arbitrary keys" in other files)
 
-def groupBy(featureCollection, properties):
-    """ groups geoJson featureCollection by given properties """
+def groupBy(featureCollection, propertiesOrFunc):
+    """ groups geoJson featureCollection by given properties or function over properties """
     if not "features" in featureCollection.keys():
         raise ValueError('features key needs to be defined {}')
     features = featureCollection["features"]
-    groups = {}
-    if isinstance(properties, str):
-        properties = [properties]
+    groups = defaultdict(list)
+    if isinstance(propertiesOrFunc, str):
+        propertiesOrFunc = [propertiesOrFunc]
     for row in features:
-        groupByValue = []
-        [groupByValue.append(row["properties"].get(prop,"")) for prop in properties]
-        groupByValue = "|".join(groupByValue)
-        if not groupByValue in groups:
-            groups[groupByValue] = [row]
+        if isinstance(propertiesOrFunc, Callable):
+            groupByValue = str(propertiesOrFunc(row["properties"]))
         else:
-            groups[groupByValue].append(row)
+            groupByValue = []
+            [groupByValue.append(str(row["properties"].get(prop,""))) for prop in propertiesOrFunc]
+            groupByValue = "|".join(groupByValue)
+        groups[groupByValue].append(row)
     return {key: geojson.FeatureCollection(group) for key, group in groups.items()}
 
 def centerPoint(featureCollection):
@@ -66,3 +68,11 @@ def getSchema(featureCollection, amount:int=10):
     if amount > len(properties):
         amount = len(properties)
     return [name for name, count in properties[:amount]]
+
+def lineToPolygon(geom):
+    """transforms a LineString to a Polygon"""
+    assert(geom["type"] == "LineString")
+    # LineString is only the exterior line of a polygon (no holes possible)
+    return geojson.Polygon(coordinates=[geom["coordinates"]], validate=True)
+
+
