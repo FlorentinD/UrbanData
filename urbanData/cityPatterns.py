@@ -82,7 +82,6 @@ except FileNotFoundError:
 
 ###################
 # use buildingGroups (only for !!pieschen!!) 
-# (21) at most 4 building-level
 pattern = "At most 4 Building-level (Pattern 21)"
 logging.info(pattern)
 
@@ -96,11 +95,11 @@ except FileNotFoundError:
 # use property levels for True
 # use estimatedLevels for Maybe (estimated)
 
-# as rooftop level does not count -> allow 5 instead of 4
 def lessThanEqual5Levels(properties):
-    levels = properties.get("levels", None)
+    # TODO add option "OnlyWithRoofTop"
+    levels = properties.get("building:levels", None)
     if levels:
-        return levels <= 5
+        return int(levels) <= 4
     else:
         estimation = properties.get("estimatedLevels", 42) <= 5 
         if estimation:
@@ -112,13 +111,22 @@ if len(buildingsByLevelRestriction) == 1:
     logging.warn("Only one building level found. Maybe the file is not correct. Rebuild via buildingComplexex.py !")
 generateFeatureCollectionForGroups(buildingsByLevelRestriction, {"True": "#33cc33", "False": "#ff0000", 'Maybe': "DimGrey"}, pattern, show=False).add_to(map)
 
-# (38) row houses
-# TODO: more suffisticated function? (could also include building type and number of addresses)
+
+pattern = "Row houses (Pattern 38)"
+# TODO use companies for building-type classifier
+# TODO !!! fix address annotation from osm data (probably node data unused (right shapely op?))
+# example https://www.openstreetmap.org/node/2480574494
+residentalBuildingGroups = []
+for group in buildingGroups["features"]:
+    # TODO: more suffisticated function? (could also include building type and number of addresses)
+    # not ("type" in f["properties"]) or "residential" in f["properties"]["type"]]
+    if group["properties"]["addresses"]:
+        residentalBuildingGroups.append(group)
+residentalBuildingGroups = geojson.FeatureCollection(residentalBuildingGroups)
+
 rowHouseGroups = groupBy(buildingGroups, lambda properties: "RowHouses" if len(properties["__buildings"]) > 1 else "SingleHouses")
 generateFeatureCollectionForGroups(rowHouseGroups, {"RowHouses": "#33cc33", "SingleHouses": "#ff0000"}, pattern, show=True).add_to(map)
 
-
-# TODO: read pattern again, if only apartment like houses count here! (also exploit multiple addresses for bigger building)
 
 ############
 
@@ -287,7 +295,7 @@ for feature in thingsWithOpeningHour["features"]:
         midnightThings.append(feature)
 
 midnightThings = geojson.FeatureCollection(midnightThings)
-geoFeatureCollectionToFoliumFeatureGroup(midnightThings, '#000066', pattern).add_to(map)
+geoFeatureCollectionToFoliumFeatureGroup(midnightThings, '#000066', pattern, show= False).add_to(map)
 
 #smokerOsmQuery = OsmDataQuery("smoking pubs", OsmObjectType.WAYANDNODE, ['"smoking"="yes"',"amenity"])
 #gamblingOsmQuery = OsmDataQuery("gambling", OsmObjectType.WAYANDNODE, ['"leisure"~"adult_gaming_centre|amusement_arcade"','"smoking"!~"yes"'])
