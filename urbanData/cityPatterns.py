@@ -187,22 +187,59 @@ geoFeatureCollectionToFoliumFeatureGroup(fitnessCentres, 'brown', "FitnessCentre
 
 pattern = "Local grocery store (Pattern 89)"
 logging.info(pattern)
-groceryQuery = OsmDataQuery("Local grocery store", OsmObjectType.WAYANDNODE, ['"shop"~"convenience|butcher|pastry|bakery|supermarket"'])
+groceryQuery = OsmDataQuery("Local grocery store", OsmObjectType.ALL, ['"shop"~"convenience|butcher|pastry|bakery|supermarket"'])
 grocery = next(overpassFetcher.directFetch(dresdenAreaId, [groceryQuery]))
-# TODO: use style_function instead of groupBy
+# TODO: use style_function instead of groupBy (or list of colors)
 groceryGroups = groupBy(grocery, "shop")
-generateFeatureCollectionForGroups(groceryGroups, "autumn", pattern).add_to(map)
-# TODO: extra voronoi for supermarkets !
+generateFeatureCollectionForGroups(groceryGroups, "autumn", pattern, show=False).add_to(map)
 
 
-pattern = "Smoking and Gambling Areas (similar to Pattern 90)"
-# TODO: try spaetis, doner und tankstellen
-logging.info(pattern)
-smokerOsmQuery = OsmDataQuery("smoking pubs", OsmObjectType.WAYANDNODE, ['"smoking"="yes"',"amenity"])
-gamblingOsmQuery = OsmDataQuery("gambling", OsmObjectType.WAYANDNODE, ['"leisure"~"adult_gaming_centre|amusement_arcade"','"smoking"!~"yes"'])
-weirdOsmAreas = overpassFetcher.directFetch(dresdenAreaId, [smokerOsmQuery, gamblingOsmQuery])
-weirdAreas = unionFeatureCollections(*weirdOsmAreas)
-geoFeatureCollectionToFoliumFeatureGroup(weirdAreas, 'yellow', pattern).add_to(map)
+
+def openAtMidnight(openingHours):
+    if openingHours == "24/7":
+        return True
+    else:
+        matches = re.findall(r"(\d+):(\d+)\s*-\s*(\d+):(\d+)", openingHours)
+        for openingHour, _, closingHour, _ in matches:
+            # has open over midnight 
+            if int(openingHour) > int(closingHour):
+                return True
+        if not matches:
+            matches = re.findall(r"(\d+)(:\d+)\+", openingHours)
+            if matches:
+                # TODO: 09:00+ -> maybe open at midnight even (could be extra group)
+                return True
+            else:
+                logging.debug(openingHours)
+        return False
+
+pattern = "Late opening hours (similar to Pattern 90 Bierhalle??)"
+logging.info(pattern) 
+
+# tankstellen: amenity=fuel
+# cuisine 	kebab (but could be included by open at midnight)
+
+
+# TODO: also exclude bars and pubs?
+# general problem: opening hours must be filled in and valid
+thingsWithOpeningHour = next(overpassFetcher.directFetch(dresdenAreaId, [OsmDataQuery("Midnight things", OsmObjectType.ALL, 
+['"opening_hours"', '"amenity"!~"parking|atm|hospital|charging_station|toilets|car_|vending_|bank"'])]))
+
+
+midnightThings = []
+for feature in thingsWithOpeningHour["features"]:
+    openingHours = feature["properties"]["opening_hours"]
+    if openAtMidnight(openingHours):
+        midnightThings.append(feature)
+
+midnightThings = geojson.FeatureCollection(midnightThings)
+geoFeatureCollectionToFoliumFeatureGroup(midnightThings, '#000066', pattern).add_to(map)
+
+#smokerOsmQuery = OsmDataQuery("smoking pubs", OsmObjectType.WAYANDNODE, ['"smoking"="yes"',"amenity"])
+#gamblingOsmQuery = OsmDataQuery("gambling", OsmObjectType.WAYANDNODE, ['"leisure"~"adult_gaming_centre|amusement_arcade"','"smoking"!~"yes"'])
+#weirdOsmAreas = overpassFetcher.directFetch(dresdenAreaId, [smokerOsmQuery, gamblingOsmQuery])
+#weirdAreas = unionFeatureCollections(*weirdOsmAreas)
+#geoFeatureCollectionToFoliumFeatureGroup(weirdAreas, 'yellow', pattern, show=False).add_to(map)
 
 
 ## TODO: allotments, parks, forest? (green area)
