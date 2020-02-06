@@ -31,10 +31,11 @@ def osmToGeoJsonGeometry(object):
     if object["type"] == "relation":
             relMembers = object["members"]
             outerGeometries = [osmToGeoJsonGeometry(m) for m in relMembers if m['role'] in ["outer",'']]
-            # members are unordered, thus for a boundary we need to order them
-            exteriorLine = transformToBoundaryLine(outerGeometries)
-            if exteriorLine:
-                outerGeometries = [exteriorLine]
+            if outerGeometries:
+                # members are unordered, thus for a boundary we need to order them
+                exteriorLine = transformToBoundaryLine(outerGeometries)
+                if exteriorLine:
+                    outerGeometries = [exteriorLine]
             innerGeometries = [osmToGeoJsonGeometry(m) for m in relMembers if m['role'] == "inner"]    
             coordinates = outerGeometries + innerGeometries
             return tryToConvertToPolygon(object.get("tags",{}), coordinates)
