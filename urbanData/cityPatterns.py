@@ -4,21 +4,24 @@ from helper.overPassHelper import OverPassHelper
 from helper.OsmDataQuery import OsmDataQuery
 from helper.OsmObjectType import OsmObjectType
 from helper.crossRoadHelper import getCrossRoads
-from helper.geoJsonHelper import unionFeatureCollections, groupBy, centerPoint
+from helper.geoJsonHelper import unionFeatureCollections, groupBy, centerPoint, lineToPolygon
 from helper.voronoiHelper import voronoiFeatureCollection
+from helper.shapelyHelper import intersections
 import logging
 import geojson
+import re
 
-
+# TODO: proper coloring !!!
+# TODO: get icons To work
 logging.basicConfig(level=logging.INFO)
 
 overpassFetcher = OverPassHelper()
 dresdenAreaId = overpassFetcher.getAreaId("Dresden, Germany")
+pieschenAreaId = overpassFetcher.getAreaId("Pieschen, Dresden, Germany")
 saxonyAreaId = overpassFetcher.getAreaId("Saxony, Germany")
 
 map = Map(location=[51.078875, 13.728524], tiles='Open Street Map', zoom_start=15)
 
-# TODO: improve boundary shape (something is still wrong)
 logging.info("Get area boundaries")
 pieschenBoundary = next(overpassFetcher.directFetch(dresdenAreaId, [OsmDataQuery(
     "Area boundaries", OsmObjectType.RELATIONSHIP, ['"boundary"~"administrative"', '"name"="Pieschen"'])]))
@@ -48,14 +51,16 @@ for name, group in groupBy(stops, "name").items():
     stopsByName.append(stopByName)
 
 # Simple stops
-geoFeatureCollectionToFoliumFeatureGroup(geojson.FeatureCollection(stopsByName), '#990000', pattern).add_to(map)
+geoFeatureCollectionToFoliumFeatureGroup(geojson.FeatureCollection(stopsByName), '#990000', pattern, show= False).add_to(map)
 
 try:
     pattern = "5 minute walk area around stops"
     logging.info(pattern)
-    file = open("out/data/timeMapsPerStop.json", encoding='UTF-8')
-    timeMaps = geojson.load(file)
+    with open("out/data/timeMapsPerStop.json", encoding='UTF-8') as file:
+        timeMaps = geojson.load(file)
     geoFeatureCollectionToFoliumFeatureGroup(timeMaps, '#990000', pattern, show = False).add_to(map)
+    heatMapGroups = intersections(timeMaps)
+    generateFeatureCollectionForGroups(heatMapGroups, "hsv", "Public Transport Heatmap", show=False).add_to(map)
 except FileNotFoundError:
     logging.error("run timeMapsRetriever to get time maps")
 
@@ -66,9 +71,9 @@ pattern = "Public Transport Change Points (Pattern 34)"
 logging.info(pattern)
 
 try:
-    file = open("out/data/dvbChangePoints.json", encoding='UTF-8')
-    changePoints = geojson.load(file)
-    geoFeatureCollectionToFoliumFeatureGroup(changePoints, '#000099', pattern).add_to(map)
+    with open("out/data/dvbChangePoints.json", encoding='UTF-8') as file:
+        changePoints = geojson.load(file)
+    geoFeatureCollectionToFoliumFeatureGroup(changePoints, '#000099', pattern, show= False).add_to(map)
 except FileNotFoundError:
     logging.error("run dvbRetriever to get info about change Points")
         
