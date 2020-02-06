@@ -129,16 +129,18 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                     fill_color=color).add_to(featureCollection)
 
             elif geom["type"] == "MultiPolygon":
-                raise ValueError("Folium does not support MultiPolygons")
-                """ loc = []
                 # TODO: rewrite MultiPolygon into multiple Polygon objects?
-                for polygon in geom["coordinates"]:
-                    for lines in polygon:
+                for polygons in geom["coordinates"]:
+                    for _, polygon in enumerate(polygons):
+                        if len(polygon) > 1:
+                            logging.debug("Folium does not support holes in Polygon -> just exterior line")
+                        exteriorLine = polygon[0]
+                        loc = []
                         if switchLatAndLong:
-                            [loc.append((lat, lon)) for point in lines]
+                            [loc.append((lat, lon)) for point in exteriorLine]
                         else:
-                          [loc.append((lon, lat)) for point in lines]  
-                folium.vector_layers.Polygon(loc, tooltip=describtion, color=color, fill_color=color).add_to(featureCollection) """
+                          [loc.append((lon, lat)) for point in exteriorLine]  
+                        folium.vector_layers.Polygon(loc, tooltip=describtion, color=color, fill_color=color).add_to(featureCollection)
             else:
                 raise ValueError("{} not mapped onto folium object yet".format(geom["type"]))
         #  layer = folium.GeoJson(
