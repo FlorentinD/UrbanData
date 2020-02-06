@@ -169,14 +169,25 @@ geoFeatureCollectionToFoliumFeatureGroup(parkingLots, 'grey', pattern).add_to(ma
 
 
 pattern = "Town Halls (Pattern 44)"
-# TODO: use city boroughs as areas and mark them if they have a town hall ... extra ""
-# TODO: use relations (also town halls) (inner and outer lines ? use type=multipolygon)
 logging.info(pattern)
 townHallOsmQuery = OsmDataQuery("Town Halls", OsmObjectType.ALL, ['"amenity"="townhall"'])
 townHalls = next(overpassFetcher.directFetch(dresdenAreaId, [townHallOsmQuery]))
-# TODO: calculating base area for each parking lot? (idealy using a annotater)
-# TODO: allow setting an icon?
-geoFeatureCollectionToFoliumFeatureGroup(townHalls, 'red', pattern).add_to(map)
+
+boroughs = next(overpassFetcher.directFetch(dresdenAreaId, [OsmDataQuery(
+    "Dreasen boundaries", OsmObjectType.RELATIONSHIP, ['"boundary"~"administrative"', 'name', '"name:prefix"="Ortsamtsbereich"'])]))
+
+# convert lines to polygons for better visualization
+boroughs = geojson.FeatureCollection([geojson.Feature(
+    geometry=lineToPolygon(feature["geometry"]), 
+    properties=feature["properties"]
+    ) 
+    for feature in boroughs["features"]])
+
+generateFeatureCollectionForGroups(
+    {"areas": boroughs, "town halls": townHalls}, 
+    ["grey", "red"], 
+    pattern, 
+    show= False).add_to(map)
 
 
 
@@ -196,7 +207,7 @@ healthGroups = {
     "pharmacies": Icon(icon="pills", color='lightgray', icon_color = 'red'), 
     "doctors": Icon(icon="suitcase-doctor", color='lightgray', icon_color = 'red')
     } """
-generateFeatureCollectionForGroups(healthGroups, "tab10", pattern, iconMap={}).add_to(map)
+generateFeatureCollectionForGroups(healthGroups, "tab10", pattern, iconMap={}, show= False).add_to(map)
 
 
 
@@ -209,7 +220,7 @@ holygrounds = {
     "places of worship": next(osmResult),
     "cementries": next(osmResult)
 }
-generateFeatureCollectionForGroups(holygrounds, 'copper', pattern, show = True).add_to(map)
+generateFeatureCollectionForGroups(holygrounds, 'copper', pattern, show = False).add_to(map)
 
 
 
@@ -220,7 +231,7 @@ fitnessCentreQuery = OsmDataQuery("Local Sport", OsmObjectType.ALL, ['"leisure"~
 osmResult = overpassFetcher.directFetch(dresdenAreaId, [sportsQuery, fitnessCentreQuery])
 sports = next(osmResult)
 fitnessCentres = next(osmResult)
-geoFeatureCollectionToFoliumFeatureGroup(sports, 'green', pattern).add_to(map)
+geoFeatureCollectionToFoliumFeatureGroup(sports, 'green', pattern, show= False).add_to(map)
 geoFeatureCollectionToFoliumFeatureGroup(fitnessCentres, 'brown', "FitnessCentres (also sports)", show=False).add_to(map)
 
 
