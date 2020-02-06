@@ -78,29 +78,68 @@ except FileNotFoundError:
 ###################
 # use buildingGroups (only for !!pieschen!!) 
 # (21) at most 4 building-level
+pattern = "At most 4 Building-level (Pattern 21)"
+logging.info(pattern)
+
+try:
+    with open("out/data/buildings_pieschen.json", encoding='UTF-8') as file:
+        buildings = geojson.load(file)
+    with open("out/data/buildingGroups_pieschen.json", encoding='UTF-8') as file:
+        buildingGroups = geojson.load(file)
+except FileNotFoundError:
+    logging.error("run buildingComplexes to get buildings and their groups")
+# use property levels for True
+# use estimatedLevels for Maybe (estimated)
+
+# as rooftop level does not count -> allow 5 instead of 4
+def lessThanEqual5Levels(properties):
+    levels = properties.get("levels", None)
+    if levels:
+        return levels <= 5
+    else:
+        estimation = properties.get("estimatedLevels", 42) <= 5 
+        if estimation:
+            return "Maybe"
+        return False
+
+buildingsByLevelRestriction = groupBy(buildings, lessThanEqual5Levels)
+if len(buildingsByLevelRestriction) == 1:
+    logging.warn("Only one building level found. Maybe the file is not correct. Rebuild via buildingComplexex.py !")
+generateFeatureCollectionForGroups(buildingsByLevelRestriction, {"True": "#33cc33", "False": "#ff0000", 'Maybe': "DimGrey"}, pattern, show=False).add_to(map)
 
 # (38) row houses
+# TODO: more suffisticated function? (could also include building type and number of addresses)
+rowHouseGroups = groupBy(buildingGroups, lambda properties: "RowHouses" if len(properties["__buildings"]) > 1 else "SingleHouses")
+generateFeatureCollectionForGroups(rowHouseGroups, {"RowHouses": "#33cc33", "SingleHouses": "#ff0000"}, pattern, show=True).add_to(map)
+
+
+# TODO: read pattern again, if only apartment like houses count here! (also exploit multiple addresses for bigger building)
 
 ############
 
-## _highway=mini_roundabout_
+logging.info("Searching for crossroads")
 
+# ! not counting service crossroad as these are not "real" cross roads (probably way less traffic I assume)
+# also excluding: link streets 
 streets = next(overpassFetcher.directFetch(
     dresdenAreaId,
     [OsmDataQuery("streets", OsmObjectType.WAY, [
-        '"highway"~"primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|service|motorway|unclassified"']
+        '"highway"~"primary$|secondary$|tertiary$|residential$|motorway$|unclassified"']
     )]
 ))
 
-crossroads = getCrossRoads(streets)
-# TODO: further process crossroads
+crossRoads = getCrossRoads(streets)
+crossRoadsByEdgeCount = groupBy(crossRoads, "edgeCount")
+
+# TODO: points on streets with tag: junction="roundabout" can be unified to one
+pattern = "T-CrossRoads (Pattern 50)"
+geoFeatureCollectionToFoliumFeatureGroup(crossRoadsByEdgeCount["3"], "black", pattern, show= False).add_to(map)
+generateFeatureCollectionForGroups(crossRoadsByEdgeCount, "viridis", "All CrossRoads", show= False).add_to(map)
 
 # (23) parallel streets (crossroads with 3-4 edges (excluding bigger crossroads))
 
 # (30) activity nodes (4 edges and some aminity/leisure/shop stuffs around)
 # try just grouping of shops/leisure/amenity?
-
-# (50) T-Crossroads (3 edges basically ?)
 
 
 ##########
@@ -108,9 +147,8 @@ crossroads = getCrossRoads(streets)
 pattern = "Night Life (Pattern 33)"
 logging.info(pattern)
 nightLifeOsmQuery = OsmDataQuery("Night Life", OsmObjectType.ALL, ['"amenity"~"bar|pub|nightclub|stripclub"'])
-# TODO: add cafes with opening hour?
 nightLife = next(overpassFetcher.directFetch(dresdenAreaId, [nightLifeOsmQuery]))
-geoFeatureCollectionToFoliumFeatureGroup(nightLife, '#52E74B', pattern).add_to(map)
+geoFeatureCollectionToFoliumFeatureGroup(nightLife, '#52E74B', pattern, show= False).add_to(map)
 
 
 """ 
