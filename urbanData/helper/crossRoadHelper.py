@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from shapely.strtree import STRtree
-from shapely.geometry import shape, mapping, Point as sPoint
+from shapely.geometry import shape, mapping, Point as sPoint, MultiPoint as sMultiPoint
 import networkx as nx
 import geojson
 import logging
@@ -12,18 +12,14 @@ from helper.geoJsonHelper import lineToPolygon
 
 
 def getCrossRoads(streets):
-    # TODO: introduce dataclass and use own asdict
-    # using x: list = field(default_factory=list)
-    invertedStreetIndex = defaultdict(lambda: {
-        "streetNames": set(),
-        "streetTypes": set(),
-        "edgeCount": 0,
-        "junctionType": "normal",
-        # for debugging
-        "ending streets": [],
-        "continuing streets": []
-    })
-    for street in streets["features"]:
+    """
+    
+    excludes crossRoads only between service roads and ones with only one street name
+    """
+    streetNodeIndex = defaultdict(lambda: CrossRoadProperties())
+    streets = streets["features"]
+    
+    for street in streets:
         name = street["properties"].get(
             "name", "osm-id: {}".format(street["id"]))
         streetType = street["properties"].get("highway")
@@ -37,11 +33,11 @@ def getCrossRoads(streets):
         points = street["geometry"]["coordinates"]
         startPoint = wgsToUtm(*points[0])
         endPoint = wgsToUtm(*points[-1])
-        Point(startPoint).distance
+
         for point in points:
             point = tuple(point)
-            invertedStreetIndex[point]["streetNames"].add(name)
-            invertedStreetIndex[point]["streetTypes"].add(streetType)
+            streetNodeIndex[point].streetNames.add(name)
+            streetNodeIndex[point].streetTypes.add(streetType)
 
             # TODO: crossRoad edge count still not correct every time (https://www.openstreetmap.org/node/3866701865)
             # 2x same street (name wise) from one direction but extra streets as both one-way
@@ -51,78 +47,115 @@ def getCrossRoads(streets):
             # 3 meter distance is arbitrary and hopefully works for most of the cases
             pointInUtm = wgsToUtm(*point)
             if pointInUtm == startPoint or pointInUtm == endPoint or distance(pointInUtm, startPoint) < 3 or distance(pointInUtm, endPoint) < 3:
-                invertedStreetIndex[point]["edgeCount"] += 1
-                invertedStreetIndex[point]["ending streets"] += [name]
+                streetNodeIndex[point].edgeCount += 1
+                streetNodeIndex[point].endingStreets += [name]
             else:
                 # as street continues after this point, thus two edges for this crossRoad
-                invertedStreetIndex[point]["edgeCount"] += 2
-                invertedStreetIndex[point]["continuing streets"] += [name]
-    crossRoads = {point: properties for point, properties in invertedStreetIndex.items() 
-                    if properties["edgeCount"] > 2 and not properties["streetTypes"] == {"service"}}
+                streetNodeIndex[point].edgeCount += 2
+                streetNodeIndex[point].continuingStreets += [name]
+    crossRoads = {point: properties for point, properties in streetNodeIndex.items() 
+                    if not (properties.edgeCount <= 2 or properties.streetTypes == {"service"})}
+    
+    roundabouts = [street for street in streets if street["properties"].get("junction") == "roundabout"]
+    crossRoadsWithRoundAbouts = regardRoundabouts(crossRoads, roundabouts)
+
+    unionedCrossRoads = groupNearbyCrossRoads(crossRoadsWithRoundAbouts)
 
     geoJsonFeatures = []
-    for location, properties in crossRoads.items():
+    for location, properties in unionedCrossRoads.items():
         geoJsonFeatures.append(geojson.Feature(
             geometry=geojson.Point(coordinates=location),
-            properties=properties
+            properties=properties.asdict()
         ))
     return geojson.FeatureCollection(geoJsonFeatures)
 
-# TODO: include into above function
-def regardRoundabouts(crossRoads, roundaboutStreets):
-    """removes crossRoads in round abouts and add one crossRoad per roundabout"""
-    for street in roundaboutStreets:
+def regardRoundabouts(crossRoads, roundAboutStreets):
+    """removes crossRoads in round abouts and add one crossRoad per roundabout street"""
+    result = crossRoads.copy()
+
+    for street in roundAboutStreets:
         roundAboutCenter = tuple(shape(street["geometry"]).centroid.coords[0])
-        assert(not roundAboutCenter in crossRoads.keys())
-        crossRoads[roundAboutCenter]["junctionType"] = "round-about"
+        assert(not roundAboutCenter in result.keys())
+        properties = CrossRoadProperties(junctionType="round-about")
         for point in street["geometry"]["coordinates"]:
             point = tuple(point)
-            crossPoint = crossRoads.pop(point)
-            crossRoads[roundAboutCenter]["streetNames"].update(crossPoint["streetNames"])
-            crossRoads[roundAboutCenter]["streetTypes"].update(crossPoint["streetTypes"])
+            otherProperties = result.pop(point, None)
+            if otherProperties:
+                properties.union(otherProperties)
+                properties.edgeCount += otherProperties.edgeCount
+                # TODO: update edgeCount?
+        if not properties.edgeCount == 0:
+            result[roundAboutCenter] = properties
             
-    # TODO: test this function
-    return crossRoads
+    # as this mutates the input
+    return result
 
-# TODO: unify crossPoints with distance > 2m ?
 def groupNearbyCrossRoads(crossRoads):
-    # using UTM coords for 2m distance
-    crossRoadRadius = 2.0
+    # using UTM coords for 20m (?) distance
+    # TODO: higher radius and then combine with streetName based approach at component lvl
+    # TODO: radius dependent on streetType (higher radius for round-abouts)
+    crossRoadRadius = 10.0
     shapelyPoints = []
     graph = nx.Graph()
 
+    # TODO: combine with streetName based approach maybe? (bigger junctions not working properly)
+
     for location, properties in crossRoads.items():
         point = sPoint(wgsToUtm(*location))
-        graph.add_node(point, properties = properties)
+        point.id = location
+        graph.add_node(location)
         shapelyPoints.append(point)
     
     index = STRtree(shapelyPoints)
 
     for point in shapelyPoints:
         radius = point.buffer(crossRoadRadius)
-        crossRoadPoints = index.query(radius)
+        crossRoadPoints = [p for p in index.query(radius) if not p == point] 
         for otherPoint in crossRoadPoints:
-            graph.add_edge(otherPoint, point)
+            graph.add_edge(otherPoint.id, point.id)
 
-    components = nx.connected_components(graph)
+    result = crossRoads.copy()
+
+    components = [component for component in nx.connected_components(graph) if not len(component) == 1]
     for nodes in components:
-        logging.debug(nodes)
-        # TODO: unify crossRoadPoints as Polygon? 
-        # TODO: convert back into WGS
-    result = []
+        closeCrossRoads = [location for location in nodes]
+        center = tuple(sMultiPoint(list(closeCrossRoads)).centroid.coords[0])
+        properties = CrossRoadProperties()
+        junctionTypes = set()
+        for location in closeCrossRoads:
+            # TODO: do not union different crossRoad Types!
+            # TODO: fix round about edge Count
+            otherProperties = result.pop(location)
+            properties.union(otherProperties)
+            
+            junctionTypes.add(otherProperties.junctionType)
+            # approximate edgeCount
+            properties.edgeCount = max(properties.edgeCount, otherProperties.edgeCount)
+        
+        properties.edgeCount = max(properties.edgeCount, len(properties.streetNames))
+        if "round-about" in junctionTypes:
+            properties.junctionType = "round-about"
+        result[center] = properties
     return result
 
 @dataclass
-class CrossRoad:
+class CrossRoadProperties:
     streetNames: dict = field(default_factory=set)
     streetTypes: dict = field(default_factory=set)
     edgeCount: int = 0
     junctionType: str = "normal"
     # for debugging purpose
-    # TODO: write own asdict method that leaves asside 
     endingStreets: list =  field(default_factory=list)
     continuingStreets: list =  field(default_factory=list)
 
     def asdict(self):
         return {k:v
                 for k,v in self.__dict__.items() if not k in ["endingStreets", "continuingStreets"]}
+    
+    def union(self, properties):
+        if not isinstance(properties, CrossRoadProperties):
+            raise ValueError("expected a CrossRoadProperties object but was {}".format(type(properties)))
+        self.streetNames.update(properties.streetNames)
+        self.streetTypes.update(properties.streetTypes)
+
+        return None
