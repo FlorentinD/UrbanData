@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import logging
 from shapely.geometry import MultiPoint, Point, Polygon, mapping, shape
 from shapely.ops import polygonize
+from shapely.strtree import STRtree
 from scipy.spatial import Voronoi
 
 def voronoi_finite_polygons_2d(vor, radius=None):
@@ -98,18 +99,25 @@ def voronoiFeatureCollection(points, mask = None):
         returns a geojsonFeatureCollection
     """
     features = points["features"]
+    propertyMap = {}
     points = []
     for feature in features:
+        properties = feature["properties"]
         geometry = feature["geometry"]
         if geometry["type"] == "Point":
-            points.append(geometry["coordinates"])
+            point = geometry["coordinates"]
+            points.append(point)
         else:
-            centerPoint = shape(geometry).centroid.coords[0]
-            points.append(centerPoint)
+            # centerPoint
+            point = shape(geometry).centroid.coords[0]
+            points.append(point)
+        propertyMap[tuple(point)] = properties
+
     vor = Voronoi(points)
     regions, vertices = voronoi_finite_polygons_2d(vor)
     pts = MultiPoint([Point(i) for i in points])
-    # TODO: this could be later replaced by border of dresden
+    pointIndex = STRtree([p for p in pts])
+
     if not mask:
         mask = pts.convex_hull
     else:
@@ -127,14 +135,23 @@ def voronoiFeatureCollection(points, mask = None):
         shapes = list(polygon.shape)
         shapes[0] += 1
         p = Polygon(np.append(polygon, polygon[0]).reshape(*shapes)).intersection(mask)
+
+        # TODO: get polygon to featurePoint mapping from voronoi diagram
+        pointsInPolygon = [point for point in pointIndex.query(p) if p.contains(point)]
+        # TODO: log if multiple points in polygon (should never happen)
+        if pointsInPolygon:
+            properties = propertyMap[tuple(pointsInPolygon[0].coords[0])]
+        else:
+            properties = None
+
         if p.geom_type == "MultiPolygon":
             polygons = list(p)
             for poly in polygons:
                 geoJsonGeom = mapping(poly)
-                features.append(geojson.Feature(geometry=geoJsonGeom))
+                features.append(geojson.Feature(geometry=geoJsonGeom, properties=properties))
         else: 
             geoJsonGeom = mapping(p)
             if not geoJsonGeom["type"] == 'Polygon':
                 raise ValueError("Voronoi area should be a polygon but got {}".format(geoJsonGeom["type"]))
-        features.append(geojson.Feature(geometry=geoJsonGeom))
+        features.append(geojson.Feature(geometry=geoJsonGeom, properties=properties))
     return geojson.FeatureCollection(features)
