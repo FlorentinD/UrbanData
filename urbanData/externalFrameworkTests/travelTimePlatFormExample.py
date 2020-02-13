@@ -9,6 +9,9 @@ api_url = 'https://api.traveltimeapp.com/v4/time-map'
 
 pointCoords = [13.673966, 51.091271]
 
+if not api_token or not app_id:
+    raise ValueError("Missing credentials for using timeMapAPI")
+
 headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
