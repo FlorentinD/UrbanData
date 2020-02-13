@@ -51,9 +51,11 @@ class AddressAnnotator(OsmAnnotator):
             addresses = {key: [houseNumber]}
         else:
             if(object["properties"].get("__nodeIds")):
+                # there could be no address info in the nodes
                 addresses = self.addressesBasedOnOsmIds(object["properties"]["__nodeIds"])
-            else:
+            if not addresses:
                 addresses = defaultdict(list)
+                # TODO: use STR tree? (index should be created on init)
                 for location in self.dataSource:
                     # 'contains' not enough for polygons having points on its edges 
                     if objectGeometry.intersects(location["geometry"]):
