@@ -44,6 +44,8 @@ class BuildingTypeClassifier(BaseAnnotator):
                 types.add("safety")
             if properties.get("leisure"):
                 types.add("leisure")
+            if properties.get("companies"):
+                types.add("commercial")
 
         return list(types)
 
