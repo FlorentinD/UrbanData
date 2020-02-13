@@ -30,7 +30,7 @@ def osmObjectsToGeoJSON(osmObjects):
 def osmToGeoJsonGeometry(object):
     if object["type"] == "relation":
             relMembers = object["members"]
-            outerGeometries = [osmToGeoJsonGeometry(m) for m in relMembers if m['role'] in ["outer",'']]
+            outerGeometries = [osmToGeoJsonGeometry(m) for m in relMembers if m['role'] in ["outer",'', 'outline']]
             if outerGeometries:
                 # members are unordered, thus for a boundary we need to order them
                 exteriorLine = transformToBoundaryLine(outerGeometries)
@@ -38,7 +38,12 @@ def osmToGeoJsonGeometry(object):
                     outerGeometries = [exteriorLine]
             innerGeometries = [osmToGeoJsonGeometry(m) for m in relMembers if m['role'] == "inner"]    
             coordinates = outerGeometries + innerGeometries
-            return tryToConvertToPolygon(object.get("tags",{}), coordinates)
+            if coordinates:
+                return tryToConvertToPolygon(object.get("tags",{}), coordinates)
+            else:
+                logging.error("Relationship uses exotic role types. Thus could not convert to geometry. Types: {}".format(
+                    [m['role'] for m in relMembers]))
+                return geojson.Point([0,0])
     elif object["type"] == "way":
         points = [[pos["lon"], pos["lat"]] for pos in object["geometry"]]
     elif object["type"] == "node":
