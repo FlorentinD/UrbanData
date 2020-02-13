@@ -5,10 +5,12 @@ import json
 import geojson
 import folium
 import networkx as nx
+from funcy import log_durations
 
 
 from shapely.geometry import Polygon, LineString, mapping, shape
 from shapely.ops import unary_union, transform
+from shapely.strtree import STRtree
 from OSMPythonTools.nominatim import Nominatim
 
 from helper.overPassHelper import OverPassHelper
@@ -27,33 +29,37 @@ from annotater.buildingLvlAnnotator import BuildingLvlAnnotator
 # TODO: also use "flurstuecke" from openDataDresden ?
 
 # TODO: take all buildings for regions and per region count number of living apartment, companies, ... (for showing percentage)
-# cannot use geopandas as pandas does not support list and dictonary datatypes)
+# cannot use geopandas as pandas does not support list and dictonary as datatypes
 
 
 # TODO: function to map region id based for an object (based on address or just geometry)
 # tag order to analyse: public, leisure, amenity, buldings, landuse, office ? ... check if company?
 
-
+@log_durations(logging.info)
 def buildGroups(buildings):
     """groups buildings together, with at least one common point returns a geo-json featurecollections
         buildings: geojson featureCollection
-        """
-
-    allBuildingsShapeGeom = list(enumerate([shape(building["geometry"]) for building in buildings["features"]]))
+    """
     objectGraph = nx.Graph()
-    for index, shape1 in allBuildingsShapeGeom:
-        objectGraph.add_node(index)
-        # as touches is symmetric looking at elements after current one is enough
-        for otherIndex, shape2 in allBuildingsShapeGeom[index+1:]: 
-            if shape1.touches(shape2):
-                objectGraph.add_edge(index, otherIndex)
+    allBuildingsShapeGeom = [shape(building["geometry"]) for building in buildings["features"]]
+    for id, buildingShape in enumerate(allBuildingsShapeGeom):
+        buildingShape.id = id
+        objectGraph.add_node(id)
+
+    buildingIndex = STRtree(allBuildingsShapeGeom)
+
+    for buildingShape in allBuildingsShapeGeom:
+        nearBuildings = buildingIndex.query(buildingShape)
+        for otherBuildingShape in nearBuildings: 
+            if buildingShape.touches(otherBuildingShape):
+                objectGraph.add_edge(buildingShape.id, otherBuildingShape.id)
    
     buildingComponents = nx.connected_components(objectGraph)
 
     # building geojson features
     buildingGroups = []
     for id, indexes in enumerate(buildingComponents):
-        buildingGeometries = [allBuildingsShapeGeom[index][1] for index in indexes]
+        buildingGeometries = [allBuildingsShapeGeom[index] for index in indexes]
         groupShape = unary_union(buildingGeometries)
         buildingIds = list(indexes)
 
