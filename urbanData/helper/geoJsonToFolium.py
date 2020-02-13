@@ -3,8 +3,9 @@ import folium
 from folium.plugins.measure_control import MeasureControl
 from folium.plugins import FeatureGroupSubGroup
 import re
-import matplotlib
+from matplotlib import colors as pltClrs, cm as pltCm
 import logging
+from enum import Enum
 
 from helper.geoJsonHelper import groupBy, getSchema
 from helper.OsmDataQuery import OsmDataQuery
@@ -13,7 +14,7 @@ from helper.OsmObjectType import OsmObjectType
 
 def cmMapColorToHex(color):
     rgb = color[:3]
-    return matplotlib.colors.rgb2hex(rgb)
+    return pltClrs.rgb2hex(rgb)
 
 
 def styleFunction(colorMap, property: str):
@@ -25,7 +26,7 @@ def styleFunction(colorMap, property: str):
 
 def collapseSubLayers(groupColorMap, groupsCount):
     """ generaters HTML to show in layer control """
-    layerDescription = ["<br> &nbsp;&nbsp;&nbsp;&nbsp;" + enhanceFeatureName(name, color, groupsCount[name]) for name, color in groupColorMap.items()]
+    layerDescription = ["<br> &nbsp;&nbsp;&nbsp;&nbsp;" + enhanceFeatureName(name, color, groupsCount[str(name)]) for name, color in groupColorMap.items()]
     return ''.join(layerDescription)
 
 
@@ -39,6 +40,8 @@ def escapePropertyValue(value):
     if isinstance(value, str):
         # ` was not allowed in Leatleaf JS 
         return value.replace("`", "\`")
+    if isinstance(value, Enum):
+        return value.value
     if isinstance(value, list):
         itemsPerLine = 6
         numberOfLineBreaks = round(len(value) / itemsPerLine)
@@ -53,14 +56,14 @@ def escapePropertyValue(value):
 
 def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, switchLatAndLong = True, icon = None, show = True):
     """from geojson feature collection to folium feature group
-
-        icon: name of the marker sign based on https://fontawesome.com/icons (only for points?)
+        ?icon: name of the marker sign based on https://fontawesome.com/icons (only for points?)
     """
 
     name = enhanceFeatureName(name, color, len(geoFeatureCollection["features"]))
     featureCollection = folium.FeatureGroup(name = name, show = show)
 
     # TODO: try MarkerCluster if atleast one point
+    # TODO factor switchLatAndLong into geoJsonHelper (geom transformer)
     # Self mapped as geojson layer not fully functional yet (open PRs)
     for feature in geoFeatureCollection["features"]:
             geom = feature["geometry"]
@@ -75,6 +78,7 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                 else:
                     point = (loc[0], loc[1])
                 if icon:
+                    # TODO: fix icon-bug (map gets empty if )
                     folium.Marker(
                         location=point,
                         tooltip=describtion,
@@ -156,17 +160,24 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
 
 def generateFeatureCollectionForGroups(groups, colors, featureName: str, iconMap = {}, show = True):
     """groups: dictionary with geojson.FeatureCollections as values
-        colors: either str (name for matplotlib colormap https://matplotlib.org/3.1.0/gallery/color/colormap_reference.html) 
-                  or list of colors
-                  or dictionary (groupName: color)
+        
+        colors: 
+            str (name for matplotlib colormap https://matplotlib.org/3.1.0/gallery/color/colormap_reference.html) 
+            or list of colors (if less colors than groups -> based on custom linearsegmented colormap)
+            or dictionary (groupName: color)
     """
 
     if isinstance(colors, str):
-        matPlotColorMap = matplotlib.cm.get_cmap(name=colors, lut=len(groups))
+        matPlotColorMap = pltCm.get_cmap(name=colors, lut=len(groups))
         colors = [cmMapColorToHex(matPlotColorMap(i)) for i in range(0, len(groups))]
     if isinstance(colors, list):
-        assert(len(colors) == len(groups))
-        colorMap = dict(zip(groups.keys(), colors))
+        if len(colors) == len(groups):
+            colorMap = dict(zip(groups.keys(), colors))
+        else:
+            # creating custom colormap
+            matPlotColorMap = pltClrs.LinearSegmentedColormap.from_list("", colors, N=len(groups))
+            colors = [cmMapColorToHex(matPlotColorMap(i)) for i in range(0, len(groups))]
+            colorMap = dict(zip(sorted(groups.keys()), colors))
     if isinstance(colors, dict):
         colorMap = colors
 
