@@ -5,10 +5,23 @@ from helper.geoJsonHelper import groupBy
 import geojson
 import logging
 
-def intersections(geoJsonFeatureCollection, idProperty = "name"):
+def intersections(geoJsonFeatureCollection, idProperty = "name", kindOfFeatures = "stations", maxIterations = None):
     """
         calculates every intersection of the geometries ...
+        ! might take quite a while for geometries with many overlapping areas 
+        ! not raster based
+
+        geoJsonFeatureCollection: input features on which intersections are calculated
+        idProperty: property of the feature used for intersection describtion
+        kindOfObjects: describtion of the features
+        maxIterations: maximum of iterations to search for new intersections (aka maximum intersection depth)
     """
+    # TODO: allow alternative version based on rasters?
+    # raster version: 
+    #   1. convex-hull or bounding box over all geoms
+    #   2. raster convex hull with given precision
+    #   3. iterate through each input geom and input raster
+    #   *4. union adjacent rasters if they have the same properties/geom-ids
     features = geoJsonFeatureCollection["features"]
     shapeMapping = { id: shapeFunc(feature["geometry"]) for id, feature in enumerate(features)}
 
@@ -22,7 +35,8 @@ def intersections(geoJsonFeatureCollection, idProperty = "name"):
     foundIntersections = set()
     result = list(shapes)
 
-    while newIntersectionsFound:
+    iterations = 0
+    while newIntersectionsFound and not maxIterations == iterations:
         index = STRtree(shapes)
         newShapes = []
         for currentShape in shapes:
@@ -53,16 +67,28 @@ def intersections(geoJsonFeatureCollection, idProperty = "name"):
         else:
             logging.debug("Found {} intersections".format(len(newShapes)))
             shapes = newShapes
-            # TODO: simplify newShapes (connected components base on ids for edges)
             result += newShapes
+        iterations += 1
 
     resultFeatures = []
     for shape in result:
-        stations = {features[id]["properties"][idProperty] for id in shape.ids}
+        featureNames = {features[id]["properties"].get(idProperty, "unnamed") for id in shape.ids}
         properties = {
-            "stations": len(stations),
-            "stationNames": stations
+            kindOfFeatures: len(featureNames),
+            "names": featureNames
         }
         resultFeatures.append(shapeGeomToGeoJson(shape, properties=properties))
-        
-    return groupBy(geojson.FeatureCollection(resultFeatures), "stations")
+
+    resultGroups = groupBy(geojson.FeatureCollection(resultFeatures), kindOfFeatures)
+    if newIntersectionsFound:
+        logging.info("Terminated earlier due to set maxIterations")
+        maxIntersections = max([int(k) for k in resultGroups.keys()])
+        resultGroups[">=" + str(maxIntersections)] = resultGroups.pop(str(maxIntersections))
+    return resultGroups
+
+
+def geomCenter(geom):
+    """
+        returns the center point for an arbitrary geometry
+    """
+    return shapeFunc(geom).centroid.coords[0]
