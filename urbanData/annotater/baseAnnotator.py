@@ -8,7 +8,7 @@ class BaseAnnotator():
         writeProperty   property which will be added to the objects by annotate()
         dataSource      data source used for annotation (f.i. company data)
     """
-    """Property added to the geojson object"""
+
     writeProperty = None
     dataSource = None
     logger = logging.getLogger('')

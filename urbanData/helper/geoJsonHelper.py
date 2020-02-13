@@ -5,7 +5,14 @@ from typing import Callable
 # TODO: wrapper methods access on geojson objects (avoid direct dict access via "arbitrary keys" in other files)
 
 def groupBy(featureCollection, propertiesOrFunc):
-    """ groups geoJson featureCollection by given properties or function over properties """
+    """ 
+    groups geoJson featureCollection by given properties or function over properties
+
+    featureCollection: geoJson FeatureCollection
+    propertiesOrFunc: expects either property or a list of properites or a function defined over "properties" of each feature
+
+    returns a dictionary groupBy-value : features
+    """
     if not "features" in featureCollection.keys():
         raise ValueError('features key needs to be defined {}')
     features = featureCollection["features"]
@@ -23,7 +30,7 @@ def groupBy(featureCollection, propertiesOrFunc):
     return {key: geojson.FeatureCollection(group) for key, group in groups.items()}
 
 def centerPoint(featureCollection):
-    """returns the center for a group of points"""
+    """returns the center point for a group of points"""
     features = featureCollection["features"]
     center = [0, 0]
     for feature in features:
@@ -41,6 +48,9 @@ def centerPoint(featureCollection):
 
 
 def unionFeatureCollections(*collections):
+    """
+    union multiple geojson FeatureCollections to one (!can contain duplicates!)
+    """
     features = []
     for collection in collections:
         if collection["type"] == "FeatureCollection":
