@@ -5,15 +5,17 @@ from collections import defaultdict
 from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
 from shapely.geometry import mapping, shape
-
+from shapely.strtree import STRtree
 from annotater.baseAnnotator import BaseAnnotator
+
 
 from helper.geoJsonConverter import osmObjectsToGeoJSON
 from helper.OsmObjectType import OsmObjectType
 
+# TODO: use shapely STR-tree to query elements?
 class OsmAnnotator(BaseAnnotator):
     osmSelector = None 
-
+    shapeIndex = None 
     def __init__(self, areaName: str, elementsToUse: OsmObjectType = OsmObjectType.NODE):
         assert(self.osmSelector)
 
@@ -23,9 +25,15 @@ class OsmAnnotator(BaseAnnotator):
         osmObjects = Overpass().query(query).toJSON()["elements"]
         # TODO: Performance ? use shapely STRTree for querying this (need to set index attr in geometry for this! https://github.com/Toblerity/Shapely/issues/618)
         self.dataSource = osmObjectsToGeoJSON(osmObjects)["features"]
-        # !!! geometry in shapely form
-        for loc in self.dataSource:  
-            loc["geometry"] = shape(loc["geometry"])
+
+        shapeGeoms = []
+        for loc in self.dataSource:
+            shapeGeom = shape(loc["geometry"])
+            shapeGeom.properties = loc["properties"]  
+            shapeGeoms.append(shapeGeom)
+          
+        self.shapeIndex = STRtree(shapeGeoms)
+        
 
 class AddressAnnotator(OsmAnnotator):
     """Annotates an object with addresses of contained objects
@@ -33,16 +41,18 @@ class AddressAnnotator(OsmAnnotator):
 
     writeProperty = "addresses"
     # TODO: allow addresses only with HouseNumber and fill in the missing details like PostalCode and street from surrounding (at buildingGroup level)
+    # or use STR tree to find nearest street
     osmSelector = ['"addr:street"', '"addr:housenumber"']
     
     @staticmethod
     def generateAddressKey(postalCode, street):
         return "{}, {}".format(postalCode, street)
-    
+
     def annotate(self, object):
         """based on geojson-object geometry or osm node-ids searches the address"""
         objectGeometry = shape(object["geometry"])
         containsAddress = [key for key in object["properties"].keys() if key.startswith("addr:housenumber")]
+        addresses = {}
         if containsAddress:
             postalCode = object["properties"].get("addr:postcode")
             street = object["properties"].get("addr:street")
@@ -55,13 +65,14 @@ class AddressAnnotator(OsmAnnotator):
                 addresses = self.addressesBasedOnOsmIds(object["properties"]["__nodeIds"])
             if not addresses:
                 addresses = defaultdict(list)
-                # TODO: use STR tree? (index should be created on init)
-                for location in self.dataSource:
+                nearbyLocations = self.shapeIndex.query(objectGeometry)
+                for location in nearbyLocations:
                     # 'contains' not enough for polygons having points on its edges 
-                    if objectGeometry.intersects(location["geometry"]):
-                        postalCode = location["properties"].get("addr:postcode")
-                        street = location["properties"].get("addr:street")
-                        houseNumber = location["properties"].get("addr:housenumber")
+                    if objectGeometry.intersects(location):
+                        properties = location.properties
+                        postalCode = properties.get("addr:postcode")
+                        street = properties.get("addr:street")
+                        houseNumber = properties.get("addr:housenumber")
                         key = self.generateAddressKey(postalCode, street)
                         addresses[key].append(houseNumber)
         # ! can still be empty (f.i. https://www.openstreetmap.org/way/35540321 or https://www.openstreetmap.org/way/32610207) could only be solved by taking nearest element with address 
@@ -89,7 +100,7 @@ class AddressAnnotator(OsmAnnotator):
                     union[key].extend(value)
         return union
 
-# TODO: refactor into class
+
 def aggregateCategoryProperties(buildingProperties):
     """list of entries (name, type, entrances)"""
     entrancesPerBranch = defaultdict(int)
@@ -110,18 +121,19 @@ def aggregateCategoryGroupProperties(properties):
 
 class OsmCompaniesAnnotator(OsmAnnotator):
     """adds shops stores in openstreetmap"""
-    # TODO: allow use crafts and companies tags
+    # TODO: allow to also use crafts tag
     osmSelector = ['"shop"']
     writeProperty = "companies"
 
     def annotate(self, object):
         """based on geojson-object geometry checks if shop are inside of the building"""
         objectGeometry = shape(object["geometry"])
-        for shop in self.dataSource:
+        nearbyGeoms = self.shapeIndex.query(objectGeometry)
+        for shopGeom in nearbyGeoms:
             # assume shops just have one entry ?? 
-            properties = shop["properties"]
+            properties = shopGeom.properties
             companyEntry = (properties.get("name", "Not named"), properties.get("shop"), 1)
-            if objectGeometry.intersects(shop["geometry"]):
+            if objectGeometry.intersects(shopGeom):
                 # insert into companies
                 if self.writeProperty in object["properties"].keys():
                     object["properties"][self.writeProperty].append(companyEntry)
@@ -139,18 +151,17 @@ class OsmCompaniesAnnotator(OsmAnnotator):
 class AmentiyAnnotator(OsmAnnotator):
     osmSelector = ["amenity",'"amenity"!~"vending_machine|parking|atm"', 'leisure!~"."']
     writeProperty = "amenities"
-    # TODO use building value for annotation also (extra annotator)
     # TODO health and food also in extra category?
 
     def annotate(self, object):
         """based on geojson-object geometry checks if shop are inside of the building"""
         objectGeometry = shape(object["geometry"])
 
-        # as OSM also uses this property, but it gets reannotated
         object["properties"][self.writeProperty] = []
-        for amenity in self.dataSource:
-            if objectGeometry.intersects(amenity["geometry"]):
-                properties = amenity["properties"]
+        nearbyGeoms = self.shapeIndex.query(objectGeometry)
+        for amenityGeom in nearbyGeoms:
+            if objectGeometry.intersects(amenityGeom):
+                properties = amenityGeom.properties
                 amenityType = properties.get("amenity")
                 entry = (properties.get("name", "Not named"), amenityType, 1)
 
@@ -184,11 +195,11 @@ class LeisureAnnotator(OsmAnnotator):
         """based on geojson-object geometry checks if shop are inside of the building"""
         objectGeometry = shape(object["geometry"])
 
-        # as OSM also uses this property, but it gets re-annotated
         object["properties"][self.writeProperty] = []
-        for leisure in self.dataSource:
-            if objectGeometry.intersects(leisure["geometry"]):
-                properties = leisure["properties"]
+        nearbyGeoms = self.shapeIndex.query(objectGeometry)
+        for leisure in nearbyGeoms:
+            if objectGeometry.intersects(leisure):
+                properties = leisure.properties
                 leisureEntry = (properties.get("name", "Not named"), properties.get("leisure"), 1)
                 # insert into companies
                 if self.writeProperty in object["properties"].keys():
