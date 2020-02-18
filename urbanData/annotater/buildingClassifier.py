@@ -56,7 +56,7 @@ class BuildingTypeClassifier(BaseAnnotator):
                     types.add(BuildingType.STORAGE)
                 elif buildingType == "power":
                     types.add(BuildingType.UTILITY)
-            if properties.get("amenity") == "pharmacy" or properties.get("healthcare"):
+            if properties.get("amenity") in ["pharmacy", "doctor", "dentist"] or properties.get("healthcare"):
                 types.add(BuildingType.HEALTH)
             if properties.get("amenity") == "place of worship" or properties.get("religion"):
                 types.add(BuildingType.HOLY)
