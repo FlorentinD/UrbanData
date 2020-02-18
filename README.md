@@ -69,6 +69,7 @@ The current scripts are for Dresden.
 Executing the scripts for the first time can take quite a while as many data from openstreetmap needs to be pulled (responses will be cached, so subsequent execution will be faster).
 
 If you change the city you should note the following:
+* ! Be sure when executing the scripts to be inside the `urbanData` folder (otherwise there may be problems finding helper and annotater classes)
 * The tags the analysis is based on may have different meanings and/or values if you change the city 
 * The scraped company data for Dresden is uploaded. For other cities they need to be scraped by yourself.
 * If you want to include data for the public transport you need to find a corresponding API as dvb will probably not work. 
