@@ -307,7 +307,7 @@ if __name__ == "__main__":
 
     geoFeatureCollectionToFoliumFeatureGroup(buildings, "black", name="Single buildings").add_to(map)
 
-    bordersFeature = geoFeatureCollectionToFoliumFeatureGroup(borders, "#996633", "borders")
+    bordersFeature = geoFeatureCollectionToFoliumFeatureGroup(borders, "#666699", "borders")
     bordersFeature.add_to(map)
 
     buildingGroupsFeature = geoFeatureCollectionToFoliumFeatureGroup(groups, "#cc9900", "building groups")

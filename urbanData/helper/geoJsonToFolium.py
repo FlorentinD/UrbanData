@@ -131,25 +131,25 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                     tooltip=describtion, 
                     color=color, 
                     fill_color=color).add_to(featureCollection)
-
             elif geom["type"] == "MultiPolygon":
-                # TODO: !!! this does not seem to work
-                logging.warn("Trying to draw MultiPolygon ... this may not work properly")
+                exteriorLines = []
                 for polygon in geom["coordinates"]:
                     if len(polygon) > 1:
                             logging.debug("Folium does not support holes in Polygon -> just exterior line")
                     exteriorLine = polygon[0]
-                    loc = []
-                    for lat, lon in exteriorLine:
+                    points = []
+                    for lon, lat in exteriorLine:
                         if switchLatAndLong:
-                            loc.append((lat, lon))
+                            points.append((lat, lon))
                         else:
-                            loc.append((lon, lat))  
-                    folium.vector_layers.Polygon(
-                        loc, 
-                        tooltip=describtion, 
-                        color=color, 
-                        fill_color=color).add_to(featureCollection)
+                            points.append((lon, lat))
+                    exteriorLines.append(points)
+                # a leaflet polygon supports multiPolygons via multiple polygon shapes inside locations
+                folium.vector_layers.Polygon(
+                    locations= exteriorLines, 
+                    tooltip=describtion, 
+                    color=color, 
+                    fill_color=color).add_to(featureCollection)
             else:
                 raise ValueError("{} not mapped onto folium object yet".format(geom["type"]))
         #  layer = folium.GeoJson(
