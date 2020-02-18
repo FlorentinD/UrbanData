@@ -1,4 +1,4 @@
-from folium import Map, LayerControl, Icon, TileLayer
+from folium import Map, LayerControl, TileLayer
 
 from helper.geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup, generateFeatureCollectionForGroups
 from helper.overPassHelper import OverPassHelper
@@ -15,8 +15,9 @@ import geojson
 import re
 
 # TODO: restructure into functions for pattern group
-# TODO: get icons To work
-logging.basicConfig(level=logging.DEBUG)
+
+# set to DEBUG for more logging
+logging.basicConfig(level=logging.INFO)
 overpassFetcher = OverPassHelper()
 dresdenAreaId = overpassFetcher.getAreaId("Dresden, Germany")
 pieschenAreaId = overpassFetcher.getAreaId("Pieschen, Dresden, Germany")
@@ -323,16 +324,11 @@ if __name__ == "__main__":
     healthGroups = {
         "pharmacies": next(osmResult),
         "doctors":  unionFeatureCollections(*osmResult)
-        }
-    #TODO: get icons to work
-    """ icons = {
-        "pharmacies": Icon(icon="pills", color='lightgray', icon_color = 'red'), 
-        "doctors": Icon(icon="suitcase-doctor", color='lightgray', icon_color = 'red')
-        } """
+    }
     generateFeatureCollectionForGroups(
-        healthGroups, 
-        {"doctors": "IndianRed", "pharmacies": "Crimson"}, 
-        pattern, iconMap={}, show= False).add_to(map)
+        healthGroups,
+        {"doctors": "IndianRed", "pharmacies": "Crimson"},
+        pattern, show=False).add_to(map)
 
     try:
         pattern = "5 minutes walking area around pharmacies"
@@ -341,7 +337,8 @@ if __name__ == "__main__":
             timeMaps = geojson.load(file)
         if COMPUTE_HEATMAPS:
             heatMapGroups = intersections(timeMaps, kindOfFeatures="pharmacies")
-            generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#9900cc"], pattern, show=False).add_to(map)
+            generateFeatureCollectionForGroups(
+                heatMapGroups, ["#0000cc", "#9900cc"], pattern, show=False).add_to(map)
         else:
             logging.info("skipped heatmap generation")
             geoFeatureCollectionToFoliumFeatureGroup(timeMaps, '#990000', pattern, show = False).add_to(map)

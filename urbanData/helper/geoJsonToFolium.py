@@ -54,9 +54,9 @@ def escapePropertyValue(value):
     else:
         return value
 
-def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, switchLatAndLong = True, icon = None, show = True):
-    """from geojson feature collection to folium feature group
-        ?icon: name of the marker sign based on https://fontawesome.com/icons (only for points?)
+def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, switchLatAndLong = True, show = True):
+    """
+    converts a geojson feature collection to a folium feature group    
     """
 
     name = enhanceFeatureName(name, color, len(geoFeatureCollection["features"]))
@@ -78,20 +78,11 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
                     point = (loc[1], loc[0])
                 else:
                     point = (loc[0], loc[1])
-                if icon:
-                    # TODO: fix icon-bug (map gets empty if )
-                    folium.Marker(
-                        location=point,
-                        tooltip=describtion,
-                        icon=icon
-                    ).add_to(featureCollection)
-                else:
-                    folium.vector_layers.CircleMarker(
-                        location=point,
-                        radius=3,
-                        tooltip=describtion,
-                        color=color,
-                        icon=icon).add_to(featureCollection)
+                folium.vector_layers.CircleMarker(
+                    location=point,
+                    radius=3,
+                    tooltip=describtion,
+                    color=color).add_to(featureCollection)
             elif geom["type"] == "LineString":
                 if switchLatAndLong:
                     loc = [(point[1], point[0])
@@ -164,7 +155,7 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
         #         layer.add_to(featureCollection)
     return featureCollection
 
-def generateFeatureCollectionForGroups(groups, colors, featureName: str, iconMap = {}, show = True):
+def generateFeatureCollectionForGroups(groups, colors, featureName: str, show = True):
     """groups: dictionary with geojson.FeatureCollections as values
         
         colors: 
@@ -203,6 +194,6 @@ def generateFeatureCollectionForGroups(groups, colors, featureName: str, iconMap
         if not type in colorMap:
             raise ValueError("{} not defined in the colormap: {}".format(type, colorMap)) 
         color = colorMap[type]
-        featureGroup = geoFeatureCollectionToFoliumFeatureGroup(group, color, type, show = show, icon=iconMap.get(type, None))
+        featureGroup = geoFeatureCollectionToFoliumFeatureGroup(group, color, type, show = show)
         featureGroup.add_to(layer)
     return layer
