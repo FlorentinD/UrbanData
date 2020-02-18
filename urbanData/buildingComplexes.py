@@ -23,17 +23,13 @@ from helper.coordSystemHelper import transformWgsToUtm as withUTMCoord
 
 from annotater.osmAnnotater import AddressAnnotator, OsmCompaniesAnnotator, AmentiyAnnotator, LeisureAnnotator, EducationAggregator, SafetyAggregator
 from annotater.companyAnnotator import CompanyAnnotator
-from annotater.buildingClassifier import BuildingTypeClassifier
+from annotater.buildingClassifier import BuildingTypeClassifier, LandUseAnnotator
 from annotater.buildingLvlAnnotator import BuildingLvlAnnotator
 
 # TODO: also use "flurstuecke" from openDataDresden ?
 
 # TODO: take all buildings for regions and per region count number of living apartment, companies, ... (for showing percentage)
 # cannot use geopandas as pandas does not support list and dictonary as datatypes
-
-
-# TODO: function to map region id based for an object (based on address or just geometry)
-# tag order to analyse: public, leisure, amenity, buldings, landuse, office ? ... check if company?
 
 @log_durations(logging.debug)
 def buildGroups(buildings):
@@ -62,8 +58,8 @@ def buildGroups(buildings):
         buildingGeometries = [allBuildingsShapeGeom[index] for index in indexes]
         groupShape = unary_union(buildingGeometries)
         # TODO: properly support MultiPolygons in geoJsonToFolium
-        if isinstance(groupShape, MultiPolygon):
-            groupShape = groupShape.convex_hull
+        #if isinstance(groupShape, MultiPolygon):
+        #    groupShape = groupShape.convex_hull
         buildingIds = list(indexes)
 
         buildingGroup = shapeGeomToGeoJson(groupShape, properties={
@@ -193,8 +189,11 @@ def annotateArea(buildings, groups, regions):
                 buildingLevels = round(avgRegionLevel)
                 if not avgRegionLevel:
                     # could be finally borough avg maybe
-                    buildingLevels = 1
-            building["properties"]["estimatedLevels"] = buildingLevels
+                    buildingLevels = None
+            building["properties"]["estimatedLevels"] = buildingLevels        
+        if not buildingLevels:
+            # default for calculating total m2
+            buildingLevels = 1
         building["properties"][BUILDINGAREA_KEY]["total in m2"] = buildingLevels *  groundArea
     
     for group in groups["features"]:
@@ -265,19 +264,17 @@ if __name__ == "__main__":
         with open("out/data/buildingRegions_pieschen.json", encoding='UTF-8') as file:
             regions = json.load(file)
 
-    
-    # TODO: boroughs (including parks, forest, allointments and sport centers?)
-  
-
-    # TODO: buildings with yes often lay inside f.i. hospital (amenity = hospital | healthcare = hospital) or landuse = police
+    # !! Change for other regions
+    postalCodes = ["01127", "01139"]
     
     # TODO: clarify dependencies between them
     annotater = [AddressAnnotator(areaOfInterest), 
                 BuildingLvlAnnotator(), 
-                CompanyAnnotator(),
+                CompanyAnnotator(postalCodes=postalCodes),
                  OsmCompaniesAnnotator(
                      areaOfInterest, OsmObjectType.WAYANDNODE),
                 BuildingTypeClassifier(),
+                LandUseAnnotator(areaOfInterest, OsmObjectType.WAY),
                 LeisureAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), 
                 AmentiyAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), 
                 SafetyAggregator(), 
@@ -310,13 +307,13 @@ if __name__ == "__main__":
 
     geoFeatureCollectionToFoliumFeatureGroup(buildings, "black", name="Single buildings").add_to(map)
 
-    bordersFeature = geoFeatureCollectionToFoliumFeatureGroup(borders, "red", "borders")
+    bordersFeature = geoFeatureCollectionToFoliumFeatureGroup(borders, "#996633", "borders")
     bordersFeature.add_to(map)
 
-    buildingGroupsFeature = geoFeatureCollectionToFoliumFeatureGroup(groups, "blue", "building groups")
+    buildingGroupsFeature = geoFeatureCollectionToFoliumFeatureGroup(groups, "#cc9900", "building groups")
     buildingGroupsFeature.add_to(map)
 
-    buildingRegionsFeature = geoFeatureCollectionToFoliumFeatureGroup(regions, "green", "building regions")
+    buildingRegionsFeature = geoFeatureCollectionToFoliumFeatureGroup(regions, "#cc3300", "building regions")
     buildingRegionsFeature.add_to(map)
 
     folium.LayerControl().add_to(map)
