@@ -67,7 +67,8 @@ def geoFeatureCollectionToFoliumFeatureGroup(geoFeatureCollection, color, name, 
     # Self mapped as geojson layer not fully functional yet (open PRs)
     for feature in geoFeatureCollection["features"]:
             geom = feature["geometry"]
-            describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items() if not k.startswith("__") and v])
+            describtion = "<br>".join(["<b>{}</b>: {}".format(k, escapePropertyValue(v)) for k, v in feature["properties"].items(
+            ) if (not k.startswith("__") or logging.getLogger().level == logging.DEBUG) and v])
             if not describtion:
                 # set to None if empty string (default for folium tooltip parameter)
                 describtion = None
