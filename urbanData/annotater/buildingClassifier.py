@@ -42,7 +42,7 @@ class BuildingTypeClassifier(BaseAnnotator):
                     types.add(BuildingType.RESIDENTIAL.value)
                 elif re.match("industrial|manufacture|warehouse|greenhouse", buildingType):
                     types.add(BuildingType.INDUSTRIAL.value)
-                elif re.match("retail|shop|supermarket|service|commercial|office|kiosk", buildingType):
+                elif re.match("retail|shop|supermarket|service|commercial|kiosk", buildingType):
                     types.add(BuildingType.COMMERCIAL.value)
                 elif buildingType == "public":
                     types.add(BuildingType.PUBLIC.value)
