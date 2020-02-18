@@ -27,7 +27,7 @@ The patterns are visualized simply by highlithing the corresponding objects, but
 The city-pattern map includes the following layers:
 * 2 different tiles 
   * the standard _openstreetmap_ 
-  * a minimalistic called stamentoner_
+  * a minimalistic called _stamentoner_
 * a boundary layer showing the boarder of Dresden as well as its boroughs
 * Public Transport:
   * Each stop (Pattern 16)
