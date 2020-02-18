@@ -102,7 +102,7 @@ def timeMapsForStops():
 def timeMapsForCityHalls():
     townHalls = next(OverPassHelper().directFetch(dresdenAreaId, [OsmDataQuery("Town Halls", OsmObjectType.ALL, ['"amenity"="townhall"'])]))
     # "driving+train" got many shapes (heatmap function could not handle them) .. trying "public_transport"
-    timeMaps = retrieveTimeMaps(townHalls["features"], travelTime=1800, transportation="public_transport")
+    timeMaps = retrieveTimeMaps(townHalls["features"], travelTime=900, transportation="public_transport")
     fileName = "out/data/timeMapsPerCityHall.json"
     with open(fileName, 'w', encoding='UTF-8') as outfile:
         logging.info("Saving at {}".format(fileName))
@@ -110,7 +110,7 @@ def timeMapsForCityHalls():
 
 def timeMapsForPharmacies():
     pharmacies = next(OverPassHelper().directFetch(dresdenAreaId, [OsmDataQuery("amenity health", OsmObjectType.ALL, ['"amenity"~"pharmacy"'])]))
-    timeMaps = retrieveTimeMaps(pharmacies["features"], travelTime=900, transportation="walking")
+    timeMaps = retrieveTimeMaps(pharmacies["features"], travelTime=300, transportation="walking")
     fileName = "out/data/timeMapsPerPharmacy.json"
     with open(fileName, 'w', encoding='UTF-8') as outfile:
         logging.info("Saving at {}".format(fileName))
