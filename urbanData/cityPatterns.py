@@ -7,6 +7,7 @@ from helper.crossRoadHelper import getCrossRoads
 from helper.geoJsonHelper import unionFeatureCollections, groupBy, centerPoint, lineToPolygon
 from helper.voronoiHelper import voronoiFeatureCollection
 from helper.shapelyHelper import intersections
+from annotater.buildingClassifier import BuildingType
 import logging
 import geojson
 import re
@@ -29,7 +30,9 @@ def lessThanEqual5Levels(properties):
         elif levels > 4:
             return "> 4 levels"
     else:
-        estimation = properties.get("estimatedLevels", 42) 
+        estimation = properties.get("estimatedLevels", None) 
+        if estimation == None:
+            return "Unknown"
         if estimation <= 5:
             return "Maybe <= 5 levels"
         else:
@@ -77,7 +80,7 @@ def getOpenAtMidnightThings():
 
 if __name__ == "__main__":
     COMPUTE_HEATMAPS = True
-    COMPUTE_VORONOI = False
+    COMPUTE_VORONOI = True
 
     map = Map(location=[51.078875, 13.728524], tiles='Open Street Map', zoom_start=15)
 
@@ -110,9 +113,13 @@ if __name__ == "__main__":
     #busStopsOsmQuery = OsmDataQuery("Bus stops", OsmObject.NODE, ['"highway"~"bus_stop"'])
     pattern = "Public Transport (Pattern 16)"
     logging.info(pattern)
-    stopsOsmQuery = OsmDataQuery("Public Transport stops", OsmObjectType.NODE, ['"public_transport"="stop_position"', '"name"!~"(Ausstieg)"'])
+    stopsOsmQuery = OsmDataQuery(
+        "Public Transport stops", 
+        OsmObjectType.NODE, 
+        ['"public_transport"="stop_position"', '"name"','"name"!~"(Ausstieg)"'])
     stops = next(overpassFetcher.directFetch(dresdenAreaId, [stopsOsmQuery]))
     stopsByName = []
+
     for name, group in groupBy(stops, "name").items():
         center = centerPoint(group)
         # TODO: more properties?
@@ -139,7 +146,7 @@ if __name__ == "__main__":
                 if t["properties"].get("name") and not "(Ausstieg)" in t["properties"]["name"]]
             )
             heatMapGroups = intersections(timeMaps)
-            generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#ffff00"], pattern, show=False).add_to(map)
+            generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#ff00ff"], pattern, show=False).add_to(map)
         else:
             logging.info("skipped heatmap generation")
             geoFeatureCollectionToFoliumFeatureGroup(timeMaps, '#990000', pattern, show = False).add_to(map)
@@ -153,7 +160,14 @@ if __name__ == "__main__":
     try:
         with open("out/data/dvbChangePoints.json", encoding='UTF-8') as file:
             changePoints = geojson.load(file)
-        geoFeatureCollectionToFoliumFeatureGroup(changePoints, '#000099', pattern, show= False).add_to(map)
+            
+        # replacing E as these are just substitute lines for another line like E8 and 8
+        changePointsPerLineCount = groupBy(
+            changePoints, 
+            lambda props: len([line for line in props.get("lines", []) if not line.strip().startswith("E")]))
+        changePointsPerLineCount.pop("1")
+        generateFeatureCollectionForGroups(
+            changePointsPerLineCount, ['#000099', "#cc0099"], pattern, show=False).add_to(map)
     except FileNotFoundError:
         logging.error("run dvbRetriever to get info about change Points")
         
@@ -179,7 +193,8 @@ if __name__ == "__main__":
             "<= 4 levels": "#33cc33", 
             "> 4 levels": "#ff0000", 
             "Maybe <= 5 levels": "#cccc00",
-            "Maybe > 5 levels": "#ff3300"
+            "Maybe > 5 levels": "#ff3300",
+            "Unknown": "#a3a3c2" 
         }, 
         pattern, 
         show=False
@@ -194,12 +209,12 @@ if __name__ == "__main__":
         # TODO: more suffisticated function? (could also include building type and number of addresses)
         # only include buildings that are living or have no building type
         # not ("type" in f["properties"]) or "residential" in f["properties"]["type"]]
-        if group["properties"]["addresses"]:
+        if BuildingType.RESIDENTIAL.value in group["properties"]["type"] or group["properties"]["type"] == [] :
             residentalBuildingGroups.append(group)
     residentalBuildingGroups = geojson.FeatureCollection(residentalBuildingGroups)
 
-    rowHouseGroups = groupBy(buildingGroups, lambda properties: "RowHouses" if len(properties["__buildings"]) > 1 else "SingleHouses")
-    generateFeatureCollectionForGroups(rowHouseGroups, {"RowHouses": "#996633", "SingleHouses": "#ff9900"}, pattern, show=True).add_to(map)
+    rowHouseGroups = groupBy(residentalBuildingGroups, lambda properties: "RowHouses" if sum([houseNumbers for houseNumbers in properties["addresses"].values()]) > 1 else "SingleHouses")
+    generateFeatureCollectionForGroups(rowHouseGroups, {"RowHouses": "#996633", "SingleHouses": "#ff9900"}, pattern, show=False).add_to(map)
 
 
     ############ cross roads
@@ -275,13 +290,13 @@ if __name__ == "__main__":
         show=False).add_to(map)
 
     try:
-        pattern = "30 minutes area around town halls (public transport)"
+        pattern = "15 minutes area around town halls (public transport)"
         logging.info(pattern)
         with open("out/data/timeMapsPerCityHall.json", encoding='UTF-8') as file:
             timeMaps = geojson.load(file)
         if COMPUTE_HEATMAPS:
             heatMapGroups = intersections(timeMaps, kindOfFeatures="town halls")
-            generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#ffff00"], pattern, show=False).add_to(map)
+            generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#9900cc"], pattern, show=False).add_to(map)
         else:
             logging.info("skipped heatmap generation")
             geoFeatureCollectionToFoliumFeatureGroup(timeMaps, '#990000', pattern, show = False).add_to(map)
@@ -311,13 +326,13 @@ if __name__ == "__main__":
     generateFeatureCollectionForGroups(healthGroups, "tab10", pattern, iconMap={}, show= False).add_to(map)
 
     try:
-        pattern = "15 minutes walking area around pharmacies"
+        pattern = "5 minutes walking area around pharmacies"
         logging.info(pattern)
         with open("out/data/timeMapsPerPharmacy.json", encoding='UTF-8') as file:
             timeMaps = geojson.load(file)
         if COMPUTE_HEATMAPS:
             heatMapGroups = intersections(timeMaps, maxIterations=2, kindOfFeatures="pharmacies")
-            generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#ffff00"], pattern, show=False).add_to(map)
+            generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#9900cc"], pattern, show=False).add_to(map)
         else:
             logging.info("skipped heatmap generation")
             geoFeatureCollectionToFoliumFeatureGroup(timeMaps, '#990000', pattern, show = False).add_to(map)
@@ -392,8 +407,11 @@ if __name__ == "__main__":
         with open("out/data/timeMapsPerMidnightThing.json", encoding='UTF-8') as file:
             openAtMidnightTimeMaps = geojson.load(file)
         if COMPUTE_HEATMAPS:
-            heatMapGroups = intersections(unionFeatureCollections(openAtMidnightTimeMaps, openEndTimeMaps), maxIterations=4, kindOfFeatures="places open at midnight")
-            generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#ffff00"], pattern, show=False).add_to(map)
+            heatMapGroups = intersections(
+                unionFeatureCollections(openAtMidnightTimeMaps, openEndTimeMaps), 
+                maxIterations=2, 
+                kindOfFeatures="places open at midnight")
+            generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#9900cc"], pattern, show=False).add_to(map)
         else:
             logging.info("skipped heatmap generation")
             geoFeatureCollectionToFoliumFeatureGroup(openEndTimeMaps, '#666699', pattern, show = False).add_to(map)
@@ -402,15 +420,21 @@ if __name__ == "__main__":
         logging.error("run timeMapsRetriever to get time maps")
 
 
+    pattern = "Green area"
+    logging.info(pattern)
+    allotmentsAndForestQuery = OsmDataQuery("Forests", OsmObjectType.WAYANDRELATIONSHIP, ['"landuse"~"allotments|forest"'])
+    gardenAndParkQuery = OsmDataQuery("Garden and parks", OsmObjectType.WAYANDRELATIONSHIP, ['"leisure"~"garden|^park$"', '"access"!~"private"'])
+    osmResult = overpassFetcher.directFetch(dresdenAreaId, [allotmentsAndForestQuery, gardenAndParkQuery])
+    allotmentsAndForest = groupBy(next(osmResult), "landuse")
+    gardenAndParks = groupBy(next(osmResult), "leisure")
+    greenAreas = {**allotmentsAndForest, **gardenAndParks}
+    generateFeatureCollectionForGroups(greenAreas, ["#006600", "#00e673"], pattern, show=False).add_to(map)
 
-    ## TODO: allotments, parks, forest? (green area)
-
-    if COMPUTE_VORONOI:
-        ## Voronoi Layers 
+    if COMPUTE_VORONOI: 
         logging.info("Computing voronoi diagrams")
 
         # Check for single boundary feature
-        voronoiBoundary = None
+        assert(len(cityBoundary["features"]) == 1)
         dresdenBorder = cityBoundary["features"][0]
         groceryVoronoi = voronoiFeatureCollection(grocery, mask=dresdenBorder)
         supermarketVoronoi = voronoiFeatureCollection(groceryGroups["supermarket"], mask=dresdenBorder)
@@ -435,5 +459,6 @@ if __name__ == "__main__":
     LayerControl().add_to(map)
 
     fileName = "out/maps/patternMap_Pieschen.html"
+    logging.info("Starting to save map in {} (this might take a while)".format(fileName))
     map.save(fileName)
     logging.info("Map saved in {}".format(fileName))
