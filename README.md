@@ -79,3 +79,4 @@ Util:
 * use multi-threading f.i. finding buildingRegions
 * use streamlit for an interactive web app (allowing to interactivly add layers and so on)
 * write way more tests
+* improve housenumber recognition out of an address
