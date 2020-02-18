@@ -8,6 +8,13 @@ At the beginning the idea was group buildings and find building regions, which c
 Resulting are building-groups (buildings having at least one common point) and building-regions (building-groups not being further apart then 120 meters and having no street in between).
 As the data from openstreetmap is not complete, f.i. many buildings are just tagges as _yes_, an additional building-type is introduced (see `annotater/buildingClassifier`).
 There are several other properties annotated as seen in the `annotater` package.
+Note that regions only contain the buildings and not the space inbetween (regarding area and shape).
+Overlapping regions exist only visually as the convex hull of the shapes are used (could not find a good method to improve shape based on region borders).
+
+![Image of a building map](images/buildingMap.png)
+
+For more images of a building map see [here](images/)
+
 
 At last there is the `cityPatterns` script, which uses the results from the `buildingComplexes` script and tries to find patterns as described by Christoph Alexander in `A Pattern-Language`.
 Besides his patterns, which were also partly modified, also others can be found in the map. 
