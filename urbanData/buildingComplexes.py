@@ -118,12 +118,13 @@ def buildRegions(buildingGroups, borders, maxGroupDistance = 120):
 
             crossesStreet = None
             potentialBorders = bordersIndex.query(connection)
+            
             for street in potentialBorders:
                 if street.crosses(connection):
                     crossesStreet = street.id
                     break
 
-            if not crossesStreet:
+            if crossesStreet == None:
                 added_edges += 1
                 buildingGroupGraph.add_edge(index, otherIndex)
             else:
