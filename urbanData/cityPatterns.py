@@ -1,4 +1,5 @@
-from folium import Map, LayerControl, Icon
+from folium import Map, LayerControl, Icon, TileLayer
+
 from helper.geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup, generateFeatureCollectionForGroups
 from helper.overPassHelper import OverPassHelper
 from helper.OsmDataQuery import OsmDataQuery
@@ -8,6 +9,7 @@ from helper.geoJsonHelper import unionFeatureCollections, groupBy, centerPoint, 
 from helper.voronoiHelper import voronoiFeatureCollection
 from helper.shapelyHelper import intersections
 from annotater.buildingClassifier import BuildingType
+
 import logging
 import geojson
 import re
@@ -68,7 +70,9 @@ def getOpenAtMidnightThings():
             '"highway"!~"."',
             '"tourism"!~"."',
             '"leisure"!~"park|fitness_centre|bowling_alley|play_ground|playground"',
-            '"amenity"!~"parking|atm|hospital|charging_station|toilets|car_|vending_|bank|restaurant|bar$|pub$|nightclub|stripclub|brothel|cinema|theatre|drinking_water|nursing_home|recycling|shower|police|bicycle_"'
+            '"amenity"!~"parking|atm|hospital|charging_station|toilets|car_|vending_|bank|restaurant|bar$|pub$|nightclub|stripclub|brothel|cinema|theatre|drinking_water|nursing_home|recycling|shower|police|bicycle_|air|post_office"',
+            '"shop"!~"hairdresser"',
+            '"office"!~"."'
             ])
         ]))
     # general problem: opening hours must be filled in and valid & what should be excluded
@@ -82,7 +86,8 @@ if __name__ == "__main__":
     COMPUTE_HEATMAPS = True
     COMPUTE_VORONOI = True
 
-    map = Map(location=[51.078875, 13.728524], tiles='Open Street Map', zoom_start=15)
+    map = Map(location=[51.078875, 13.728524], tiles='Stamen Toner', zoom_start=13)
+    TileLayer("openstreetmap").add_to(map)
 
     logging.info("Get boundaries")
     boroughs = next(overpassFetcher.directFetch(
@@ -166,6 +171,7 @@ if __name__ == "__main__":
             changePoints, 
             lambda props: len([line for line in props.get("lines", []) if not line.strip().startswith("E")]))
         changePointsPerLineCount.pop("1")
+        changePointsPerLineCount = {"{} lines".format(k): v for k,v in changePointsPerLineCount.items() if int(k) > 1}
         generateFeatureCollectionForGroups(
             changePointsPerLineCount, ['#000099', "#cc0099"], pattern, show=False).add_to(map)
     except FileNotFoundError:
@@ -193,7 +199,7 @@ if __name__ == "__main__":
             "<= 4 levels": "#33cc33", 
             "> 4 levels": "#ff0000", 
             "Maybe <= 5 levels": "#cccc00",
-            "Maybe > 5 levels": "#ff3300",
+            "Maybe > 5 levels": "#ff9900",
             "Unknown": "#a3a3c2" 
         }, 
         pattern, 
@@ -323,7 +329,10 @@ if __name__ == "__main__":
         "pharmacies": Icon(icon="pills", color='lightgray', icon_color = 'red'), 
         "doctors": Icon(icon="suitcase-doctor", color='lightgray', icon_color = 'red')
         } """
-    generateFeatureCollectionForGroups(healthGroups, "tab10", pattern, iconMap={}, show= False).add_to(map)
+    generateFeatureCollectionForGroups(
+        healthGroups, 
+        {"doctors": "IndianRed", "pharmacies": "Crimson"}, 
+        pattern, iconMap={}, show= False).add_to(map)
 
     try:
         pattern = "5 minutes walking area around pharmacies"
@@ -331,7 +340,7 @@ if __name__ == "__main__":
         with open("out/data/timeMapsPerPharmacy.json", encoding='UTF-8') as file:
             timeMaps = geojson.load(file)
         if COMPUTE_HEATMAPS:
-            heatMapGroups = intersections(timeMaps, maxIterations=2, kindOfFeatures="pharmacies")
+            heatMapGroups = intersections(timeMaps, kindOfFeatures="pharmacies")
             generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#9900cc"], pattern, show=False).add_to(map)
         else:
             logging.info("skipped heatmap generation")
@@ -352,7 +361,6 @@ if __name__ == "__main__":
     generateFeatureCollectionForGroups(holygrounds, 'copper', pattern, show = False).add_to(map)
 
 
-
     pattern = "LocalSport (Pattern 72)"
     logging.info(pattern)
     sportsQuery = OsmDataQuery("Local Sport", OsmObjectType.ALL, ["sport", '"sport"!="no"' , '"opening_hours"!~"."'])
@@ -362,8 +370,6 @@ if __name__ == "__main__":
     fitnessCentres = next(osmResult)
     geoFeatureCollectionToFoliumFeatureGroup(sports, 'green', pattern, show= False).add_to(map)
     #geoFeatureCollectionToFoliumFeatureGroup(fitnessCentres, 'brown', "FitnessCentres (also sports)", show=False).add_to(map)
-
-
     # alternatives: leisure=sports_centre|stadium|track|pitch|horse_riding|swimming_pool|recreation_ground|golf_course
     #       or club=sport
 
@@ -384,7 +390,6 @@ if __name__ == "__main__":
         },
         pattern,
         show=False).add_to(map)
-
 
 
     # rooted in Pattern 90 Bierhalle (but now very different)
@@ -410,7 +415,7 @@ if __name__ == "__main__":
             heatMapGroups = intersections(
                 unionFeatureCollections(openAtMidnightTimeMaps, openEndTimeMaps), 
                 maxIterations=2, 
-                kindOfFeatures="places open at midnight")
+                kindOfFeatures="places")
             generateFeatureCollectionForGroups(heatMapGroups, ["#0000cc", "#9900cc"], pattern, show=False).add_to(map)
         else:
             logging.info("skipped heatmap generation")
