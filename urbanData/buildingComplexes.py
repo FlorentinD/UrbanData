@@ -228,7 +228,7 @@ def annotateArea(buildings, groups, regions):
     return (buildings, groups, regions)
 
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 if __name__ == "__main__":
     areaOfInterest = 'Pieschen, Dresden, Germany'
@@ -274,10 +274,10 @@ if __name__ == "__main__":
                 CompanyAnnotator(postalCodes=postalCodes),
                  OsmCompaniesAnnotator(
                      areaOfInterest, OsmObjectType.WAYANDNODE),
-                BuildingTypeClassifier(),
                 LandUseAnnotator(areaOfInterest, OsmObjectType.WAY),
                 LeisureAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), 
                 AmentiyAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), 
+                BuildingTypeClassifier(),
                 SafetyAggregator(), 
                 EducationAggregator()]
 

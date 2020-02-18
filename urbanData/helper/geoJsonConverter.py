@@ -6,13 +6,15 @@ import networkx as nx
 POLYGON_TAGS = set(["building", "landuse", "area"])
 LINESTRING_TAGS = set(["boundary"])
 
-def osmObjectsToGeoJSON(osmObjects):
-    """given a list osm-objects as json (! in geom out-format!)"""
+def osmObjectsToGeoJSON(osmObjects, polygonize = False):
+    """given a list osm-objects as json (! in geom out-format!)
+        polygonize: try to convert every way to a polygon
+    """
     features = []
     for object in osmObjects:
         type = object["type"]
         properties = object["tags"]
-        geometry = osmToGeoJsonGeometry(object)
+        geometry = osmToGeoJsonGeometry(object, polygonize)
         if type == "way":
             properties["__nodeIds"] = object["nodes"]
         elif type == "node":
@@ -27,19 +29,19 @@ def osmObjectsToGeoJSON(osmObjects):
     return result
 
 
-def osmToGeoJsonGeometry(object):
+def osmToGeoJsonGeometry(object, polygonize):
     if object["type"] == "relation":
             relMembers = object["members"]
-            outerGeometries = [osmToGeoJsonGeometry(m) for m in relMembers if m['role'] in ["outer",'', 'outline']]
+            outerGeometries = [osmToGeoJsonGeometry(m, polygonize) for m in relMembers if m['role'] in ["outer",'', 'outline']]
             if outerGeometries:
                 # members are unordered, thus for a boundary we need to order them
                 exteriorLine = transformToBoundaryLine(outerGeometries)
                 if exteriorLine:
                     outerGeometries = [exteriorLine]
-            innerGeometries = [osmToGeoJsonGeometry(m) for m in relMembers if m['role'] == "inner"]    
+            innerGeometries = [osmToGeoJsonGeometry(m, polygonize) for m in relMembers if m['role'] == "inner"]    
             coordinates = outerGeometries + innerGeometries
             if coordinates:
-                return tryToConvertToPolygon(object.get("tags",{}), coordinates)
+                return tryToConvertToPolygon(object.get("tags",{}), coordinates, polygonize)
             else:
                 logging.error("Relationship uses exotic role types. Thus could not convert to geometry. Types: {}".format(
                     [m['role'] for m in relMembers]))
@@ -54,21 +56,23 @@ def osmToGeoJsonGeometry(object):
         raise ValueError('osm object has no geometry {}'.format(object))
     if len(points) > 1:
         # [points] as ways can only be a simple line
-        return tryToConvertToPolygon(object.get("tags",{}), [points])
+        return tryToConvertToPolygon(object.get("tags",{}), [points], polygonize)
     else:
         assert(len(points) == 1)
         return geojson.Point(points[0], validate=True)
 
-def tryToConvertToPolygon(tags, lines):
+def tryToConvertToPolygon(tags, lines, polygonize):
     # as sometimes tags like "area":"no" exists, which are obviously no polygons
     tags = {tag: v for tag, v in tags.items() if not v == "no"}
 
     # osm-multipolygon: means just as complex area ... but geojson polygons can also handle holes
-    if POLYGON_TAGS.intersection(tags) or tags.get("type") == "multipolygon": 
+    # TODO: sometimes they are real multipolygons? (see Dresdener Heide)
+    if POLYGON_TAGS.intersection(tags) or tags.get("type") == "multipolygon" or polygonize: 
         polygon = geojson.Polygon(lines)
         if not polygon.errors():
             return polygon
-        else:
+        elif not polygonize:
+            # with polygonize == true it is expected that this wont work every time
             logging.debug("Could not be converted to a polygon with tags {}".format(tags))
     if len(lines) == 1:
         return geojson.LineString(lines[0], validate=True)

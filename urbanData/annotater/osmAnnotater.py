@@ -1,6 +1,7 @@
 import re
 import geojson
-import statistics
+import logging
+
 from collections import defaultdict
 from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder, Overpass
@@ -12,7 +13,6 @@ from annotater.baseAnnotator import BaseAnnotator
 from helper.geoJsonConverter import osmObjectsToGeoJSON
 from helper.OsmObjectType import OsmObjectType
 
-# TODO: use shapely STR-tree to query elements?
 class OsmAnnotator(BaseAnnotator):
     osmSelector = None 
     shapeIndex = None 
@@ -23,8 +23,8 @@ class OsmAnnotator(BaseAnnotator):
         query = overpassQueryBuilder(
             area=areaId, elementType=elementsToUse.value, selector= self.osmSelector, out='geom')
         osmObjects = Overpass().query(query).toJSON()["elements"]
-        # TODO: Performance ? use shapely STRTree for querying this (need to set index attr in geometry for this! https://github.com/Toblerity/Shapely/issues/618)
-        self.dataSource = osmObjectsToGeoJSON(osmObjects)["features"]
+        
+        self.dataSource = osmObjectsToGeoJSON(osmObjects, polygonize = True)["features"]
 
         shapeGeoms = []
         for loc in self.dataSource:
@@ -92,23 +92,29 @@ class AddressAnnotator(OsmAnnotator):
     
     @staticmethod
     def aggregateProperties(addresses):
-        """unions multiple addresses"""
-        union = defaultdict(list)
+        """
+            unions multiple addresses 
+            ! just counts the houseNumbers in regions and groups
+        """
+        union = defaultdict(int)
         for dic in addresses:
             for key, value in dic.items():
-                if value:
-                    union[key].extend(value)
+                if isinstance(value, list):
+                    union[key] += len(value)
+                else:
+                    union[key] += value
         return union
 
 
 def aggregateCategoryProperties(buildingProperties):
     """list of entries (name, type, entrances)"""
-    entrancesPerBranch = defaultdict(int)
+    namesPerBranch = defaultdict(set)
     for companiesPerBuilding in buildingProperties:
         if companiesPerBuilding:
-            for _, branch, entrances in companiesPerBuilding:
-                entrancesPerBranch[branch] += entrances
-    return entrancesPerBranch
+            for name, branch, _ in companiesPerBuilding:
+                namesPerBranch[branch].add(name)
+
+    return {branch: len(names) for branch, names in namesPerBranch.items()}
 
 def aggregateCategoryGroupProperties(properties):
     """like companies, education, ..."""
@@ -160,9 +166,9 @@ class AmentiyAnnotator(OsmAnnotator):
         object["properties"][self.writeProperty] = []
         nearbyGeoms = self.shapeIndex.query(objectGeometry)
         for amenityGeom in nearbyGeoms:
+            properties = amenityGeom.properties
+            amenityType = properties.get("amenity")
             if objectGeometry.intersects(amenityGeom):
-                properties = amenityGeom.properties
-                amenityType = properties.get("amenity")
                 entry = (properties.get("name", "Not named"), amenityType, 1)
 
                 if amenityType in ["police", "fire_station"]:
@@ -177,7 +183,17 @@ class AmentiyAnnotator(OsmAnnotator):
                         object["properties"]["education"] = [entry]
                 elif amenityType:
                     object["properties"][self.writeProperty].append(entry)
-                
+
+        # areas containing the object, the index won't work
+        amentyAreas = [s for s in self.dataSource if not (s["properties"].get("building") or s["geometry"]["type"] == "Point")]
+        types = set()
+
+        for area in amentyAreas:
+            amenityType = area["properties"].get("amenity")
+            if shape(area["geometry"]).contains(objectGeometry):
+                types.add(amenityType)
+        if types:
+            object["properties"]["__amenityTypes"] = list(types)
         return object
 
     def aggregateProperties(self, amenities):
