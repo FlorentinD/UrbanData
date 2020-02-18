@@ -84,7 +84,7 @@ def intersections(geoJsonFeatureCollection, idProperty = "name", kindOfFeatures 
         logging.info("Terminated earlier due to set maxIterations")
         maxIntersections = max([int(k) for k in resultGroups.keys()])
         resultGroups[">=" + str(maxIntersections)] = resultGroups.pop(str(maxIntersections))
-    return resultGroups
+    return {"{} {}".format(k, kindOfFeatures): v for k,v in resultGroups.items()}
 
 
 def geomCenter(geom):
