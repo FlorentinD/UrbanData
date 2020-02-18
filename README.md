@@ -5,9 +5,9 @@ It fetches data mostly from openstreetmap, but also from other sources as dvb fo
 Examples maps produced by the scripts explained in the following can be found [here](example_maps/).
 
 The simplest script is the `urbanDataMap` which just fetches relevant openstreetmap data and visualizes it in a map. 
-At the beginning the idea was group buildings and find building regions, which can be seen in `buildingComplexes` script.
+At the beginning the idea was group buildings and find building regions, which can be seen in the `buildingComplexes.py` script.
 Resulting are building-groups (buildings having at least one common point) and building-regions (building-groups not being further apart then 120 meters and having no street in between).
-As the data from openstreetmap is not complete, f.i. many buildings are just tagges as _yes_, an additional building-type is introduced (see `annotater/buildingClassifier`).
+As the data from openstreetmap is not complete, f.i. many buildings are just tagges as _yes_, an additional building-type is introduced (see `annotater/buildingClassifier.py`).
 There are several other properties annotated as seen in the `annotater` package.
 Currently the analysis is only done over Pieschen.
 Note that regions only contain the buildings and not the space inbetween (regarding area and shape).
