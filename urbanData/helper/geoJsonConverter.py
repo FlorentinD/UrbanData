@@ -33,15 +33,26 @@ def osmToGeoJsonGeometry(object, polygonize):
     if object["type"] == "relation":
             relMembers = object["members"]
             outerGeometries = [osmToGeoJsonGeometry(m, polygonize) for m in relMembers if m['role'] in ["outer",'', 'outline']]
+            isMultiPolygon = False
+
             if outerGeometries:
                 # members are unordered, thus for a boundary we need to order them
-                exteriorLine = transformToBoundaryLine(outerGeometries)
-                if exteriorLine:
-                    outerGeometries = [exteriorLine]
-            innerGeometries = [osmToGeoJsonGeometry(m, polygonize) for m in relMembers if m['role'] == "inner"]    
-            coordinates = outerGeometries + innerGeometries
+                exteriorLineCount, exteriorLines = transformToBoundaryLine(outerGeometries)
+                if exteriorLines:
+                    outerGeometries = exteriorLines
+                if exteriorLineCount > 1:
+                    isMultiPolygon = True
+            innerGeometries = [osmToGeoJsonGeometry(m, polygonize) for m in relMembers if m['role'] == "inner"]
+
+            if not isMultiPolygon:
+                coordinates = outerGeometries + innerGeometries
+            else:
+                # TODO: if multiPolygon -> match innerGeometries ("holes") to exteriorLine
+                logging.info("Leaving out holes for osm-way with id: {}".format(object["id"]))
+                coordinates = outerGeometries
+
             if coordinates:
-                return tryToConvertToPolygon(object.get("tags",{}), coordinates, polygonize)
+                return tryToConvertToPolygon(object.get("tags",{}), coordinates, polygonize, isMultiPolygon = isMultiPolygon)
             else:
                 logging.error("Relationship uses exotic role types. Thus could not convert to geometry. Types: {}".format(
                     [m['role'] for m in relMembers]))
@@ -61,14 +72,19 @@ def osmToGeoJsonGeometry(object, polygonize):
         assert(len(points) == 1)
         return geojson.Point(points[0], validate=True)
 
-def tryToConvertToPolygon(tags, lines, polygonize):
+def tryToConvertToPolygon(tags, lines, polygonize, isMultiPolygon = False):
     # as sometimes tags like "area":"no" exists, which are obviously no polygons
     tags = {tag: v for tag, v in tags.items() if not v == "no"}
 
     # osm-multipolygon: means just as complex area ... but geojson polygons can also handle holes
-    # TODO: sometimes they are real multipolygons? (see Dresdener Heide)
+    # sometimes they are real multipolygons? (see Dresdener Heide) --> isMultiPolygon
     if POLYGON_TAGS.intersection(tags) or tags.get("type") == "multipolygon" or polygonize: 
-        polygon = geojson.Polygon(lines)
+        if isMultiPolygon:
+            # creating a polygon array for each line (only exterior lines, no holes currently)
+            lines = [[line] for line in lines]
+            polygon = geojson.MultiPolygon(lines)
+        else:
+            polygon = geojson.Polygon(lines)
         if not polygon.errors():
             return polygon
         elif not polygonize:
@@ -83,25 +99,35 @@ def tryToConvertToPolygon(tags, lines, polygonize):
 
 def transformToBoundaryLine(lines):
     """
-        tries to find an euler circuit based on all lines
+        tries to find an euler circuit for each components (based on all lines/line segments)
+        returns a tuple (number of boundary lines (= number of polygons), list of the boundary lines)
     """
     graph = nx.Graph()
+    # init graph
     for line in lines:
         points = [tuple(p)  for p in line["coordinates"]]
         for p in points:
             graph.add_node(p)
         for start, end in zip(points, points[1:]): 
             graph.add_edge(start, end)
-    try:
-        edges = list(nx.eulerian_circuit(graph))
-        startpoint = edges[0][0]
-        points = [start for start, end in edges]
-        # add startpoint, as polygon rings have to end, where they started
-        points.append(startpoint)
-        return points
-    except nx.NetworkXError:
-        logging.debug("Boundary line was not an euler train")
-        return None
+    
+    # each subgraph is one boundary line
+    subgraphs = list(nx.connected_component_subgraphs(graph))
+    lines = []
+    for graph in subgraphs:
+        try:
+            edges = list(nx.eulerian_circuit(graph))
+            startpoint = edges[0][0]
+            points = [start for start, end in edges]
+            # add startpoint, as polygon rings have to end, where they started
+            points.append(startpoint)
+            lines.append(points)
+        except nx.NetworkXError:
+            # TODO: allow partly lines and partly polygons
+            logging.debug("One of the boundary lines was not an euler train .. a very weird shape this one has")
+            return 0, None
+    return len(lines), lines
+    
 
 def shapeGeomToGeoJson(shape, properties = None):
     geometry = mapping(shape)
