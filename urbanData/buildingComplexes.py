@@ -143,7 +143,13 @@ def buildRegions(buildingGroups, borders, maxGroupDistance = 120):
         regionShape = unary_union(groupForRegionGeometries).convex_hull
 
         borderIndexes = set.union(*[buildingGroupGraph.node[index]['borders'] for index in groupIds])
-        regionBorders = [borders["features"][index]["properties"].get("name", "border{}".format(index)) for index in borderIndexes]
+        regionBorders = [
+            borders["features"][index]["properties"].get(
+                "name",
+                borders["features"][index]["properties"].get(
+                    "ref",
+                    "border{}".format(index)
+                )) for index in borderIndexes]
         # remove duplicate street names (as streets often segmented by crossings)
         regionBorders = list(set(regionBorders))
         groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
