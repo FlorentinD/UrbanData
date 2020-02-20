@@ -6,8 +6,8 @@ Examples maps produced by the scripts explained in the following can be found [h
 Each map has a layer control at the upper right, where you can enable and disable individual layers as well as changing the base-tiles.
 
 1. [Content/Scripts](#contentscripts)
-  1.1 [BuildingComplexes](#buildingcomplexes)
-  1.2 [City Patterns](#city-patterns) 
+    1. [BuildingComplexes](#buildingcomplexes)
+    2. [City Patterns](#city-patterns) 
 2. [Getting started](#getting-started)    
 3. [Package dependency](#package-dependency)         
 4. [Further ideas](#further-ideas)
