@@ -4,7 +4,7 @@ from helper.geoJsonToFolium import geoFeatureCollectionToFoliumFeatureGroup, gen
 from helper.overPassHelper import OverPassHelper
 from helper.OsmDataQuery import OsmDataQuery
 from helper.OsmObjectType import OsmObjectType
-from helper.crossRoadHelper import getCrossRoads
+from helper.crossRoadHelper import getCrossRoads, groupNearbyCrossRoads
 from helper.geoJsonHelper import unionFeatureCollections, groupBy, centerPoint, lineToPolygon
 from helper.voronoiHelper import voronoiFeatureCollection
 from helper.shapelyHelper import intersections
@@ -42,7 +42,7 @@ def lessThanEqual5Levels(properties):
         else:
             return "Maybe > 5 levels"
 
-def openAtMidnight(openingHours):
+def isOpenAtMidnight(openingHours):
     if openingHours == "24/7":
         return True
     else:
@@ -80,9 +80,23 @@ def getOpenAtMidnightThings():
     # general problem: opening hours must be filled in and valid & what should be excluded specifically
     # TODO: easier to state what tags are allowed?
 
-    midnightThings = groupBy(thingsWithOpeningHour, lambda props: openAtMidnight(props["opening_hours"]))
+    midnightThings = groupBy(thingsWithOpeningHour, lambda props: isOpenAtMidnight(props["opening_hours"]))
     midnightThings.pop('False')
     return midnightThings
+
+def groupStopsByName(stops):
+    stopsByName = []
+    for name, group in groupBy(stops, "name").items():
+        center = centerPoint(group)
+        # TODO: more properties?
+        # TODO: maybe draw line instead of just center point?
+        properties = {
+            "name": name,
+            "stop_positions": len(group["features"])
+        }
+        stopByName = geojson.Feature(geometry=center, properties=properties)
+        stopsByName.append(stopByName)
+    return stopsByName
 
 if __name__ == "__main__":
     COMPUTE_HEATMAPS = True
@@ -117,7 +131,6 @@ if __name__ == "__main__":
 
     generateFeatureCollectionForGroups(boundaries, ["grey", "black"], "Boundaries", show=True).add_to(map)
 
-    #busStopsOsmQuery = OsmDataQuery("Bus stops", OsmObject.NODE, ['"highway"~"bus_stop"'])
     pattern = "Public Transport (Pattern 16)"
     logging.info(pattern)
     stopsOsmQuery = OsmDataQuery(
@@ -125,18 +138,7 @@ if __name__ == "__main__":
         OsmObjectType.NODE, 
         ['"public_transport"="stop_position"', '"name"','"name"!~"(Ausstieg)"'])
     stops = next(overpassFetcher.directFetch(dresdenAreaId, [stopsOsmQuery]))
-    stopsByName = []
-
-    for name, group in groupBy(stops, "name").items():
-        center = centerPoint(group)
-        # TODO: more properties?
-        # TODO: maybe draw line instead of just center point?
-        properties = {
-            "name": name,
-            "stop_positions": len(group["features"])
-        }
-        stopByName = geojson.Feature(geometry=center, properties=properties)
-        stopsByName.append(stopByName)
+    stopsByName = groupStopsByName(stops)
 
     # Simple stops
     geoFeatureCollectionToFoliumFeatureGroup(geojson.FeatureCollection(stopsByName), '#990000', pattern, show= False).add_to(map)
@@ -146,7 +148,6 @@ if __name__ == "__main__":
         logging.info(pattern)
         with open("out/data/timeMapsPerStop.json", encoding='UTF-8') as file:
             timeMaps = geojson.load(file)
-        # removes duplicates (empty name and containing "(Ausstieg)") (can be removed when timeMaps are recomputed)
         if COMPUTE_HEATMAPS:
             timeMaps = geojson.FeatureCollection(
                 [t for t in timeMaps["features"]
