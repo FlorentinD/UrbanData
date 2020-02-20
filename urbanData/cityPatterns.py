@@ -13,11 +13,12 @@ from annotater.buildingClassifier import BuildingType
 import logging
 import geojson
 import re
+from collections import OrderedDict
 
 # TODO: restructure into functions for pattern group
 
-# set to DEBUG for more logging
-logging.basicConfig(level=logging.INFO)
+# set to DEBUG for more logging a more verbous describtion for some objects
+logging.basicConfig(level=logging.DEBUG)
 overpassFetcher = OverPassHelper()
 dresdenAreaId = overpassFetcher.getAreaId("Dresden, Germany")
 pieschenAreaId = overpassFetcher.getAreaId("Pieschen, Dresden, Germany")
@@ -57,8 +58,8 @@ def openAtMidnight(openingHours):
             if matches:
                 # TODO: 09:00+ -> maybe open at midnight even (could be extra group)
                 return "Open end"
-            else:
-                logging.debug(openingHours)
+            #else:
+            #    logging.debug(openingHours)
         return False
 
 def getOpenAtMidnightThings():
@@ -76,7 +77,7 @@ def getOpenAtMidnightThings():
             '"office"!~"."'
             ])
         ]))
-    # general problem: opening hours must be filled in and valid & what should be excluded
+    # general problem: opening hours must be filled in and valid & what should be excluded specifically
     # TODO: easier to state what tags are allowed?
 
     midnightThings = groupBy(thingsWithOpeningHour, lambda props: openAtMidnight(props["opening_hours"]))
@@ -240,10 +241,12 @@ if __name__ == "__main__":
     ))
 
     crossRoads, roundAbouts = getCrossRoads(streets)
-    crossRoadsByEdgeCount = groupBy(crossRoads, "edgeCount")
+    crossRoadsByEdgeCount = groupBy(crossRoads, lambda props: props["edgeCount"] if props["edgeCount"] < 6 else ">= 6")
 
     pattern = "T-CrossRoads (Pattern 50)"
-    geoFeatureCollectionToFoliumFeatureGroup(crossRoadsByEdgeCount["3"], "black", pattern, show= False).add_to(map)
+    tCrossRoads = crossRoadsByEdgeCount.get("3")
+    if tCrossRoads:
+        geoFeatureCollectionToFoliumFeatureGroup(tCrossRoads, "black", pattern, show= False).add_to(map)
     generateFeatureCollectionForGroups(crossRoadsByEdgeCount, ["#003399", "#00ffff"], "All CrossRoads", show= False).add_to(map)
     geoFeatureCollectionToFoliumFeatureGroup(roundAbouts, "green", "Round Abouts", show= False).add_to(map)
 

@@ -16,6 +16,7 @@ def getCrossRoads(streets, groupingRadius = 15):
     """  
     Excludes crossRoads between service roads and ones with only one street name.
     Groups nearby crossRoads given by groupingRadius.
+    Groups roundAbout crossRoads by a fixed radius currently.
     """
     streetNodeIndex = defaultdict(lambda: CrossRoadProperties())
     streets = streets["features"]
@@ -45,30 +46,32 @@ def getCrossRoads(streets, groupingRadius = 15):
             streetNodeIndex[point].streetNames.add(name)
             streetNodeIndex[point].streetTypes.add(streetType)
 
-            # TODO: crossRoad edge count still not correct every time (https://www.openstreetmap.org/node/3866701865)
-            # 2x same street (name wise) from one direction but extra streets as both one-way
-            # could use tag: oneway=yes
-
-            # points are crosspoints but not exactly the end of the street segment ...
+            # points are crosspoints but not exactly the end of the street segment (only sometimes)
+            # continuing and endingStreets to circumvent this problem
             # 3 meter distance is arbitrary and hopefully works for most of the cases
             pointInUtm = wgsToUtm(*point)
             if pointInUtm == startPoint or pointInUtm == endPoint or distance(pointInUtm, startPoint) < 3 or distance(pointInUtm, endPoint) < 3:
-                streetNodeIndex[point].edgeCount += 1
                 streetNodeIndex[point].endingStreets += [name]
             else:
-                # as street continues after this point, thus two edges for this crossRoad
-                streetNodeIndex[point].edgeCount += 2
                 streetNodeIndex[point].continuingStreets += [name]
-    crossRoads = {point: properties for point, properties in streetNodeIndex.items() 
-                    if not (properties.edgeCount <= 2 or properties.streetTypes == {"service"} or len(properties.streetNames) == 1)}
     
     roundabouts = [street for street in streets if street["properties"].get("junction") == "roundabout"]
-    crossRoads = regardRoundabouts(crossRoads, roundabouts)
+    crossRoads = regardRoundabouts(streetNodeIndex, roundabouts)
 
-    normalCrossRoads = {c: prop for c, prop in crossRoads.items() if not prop.junctionType == JunctionType.ROUNDABOUT}
-    roundAboutCrossRoads = {c: prop for c, prop in crossRoads.items() if prop.junctionType == JunctionType.ROUNDABOUT}
+    for _, properties in crossRoads.items():
+        properties.computeEdgeCount()
+    
+     # filter crossRoads for real ones (just changing street-names or a road splitting into 2 lanes does not count)
+    normalCrossRoads = {c: prop for c, prop in crossRoads.items() if not (
+        prop.junctionType == JunctionType.ROUNDABOUT and properties.edgeCount > 2 or properties.streetTypes == {"service"})}
+
+    roundAboutCrossRoads = {c: prop for c, prop in crossRoads.items(
+    ) if prop.junctionType == JunctionType.ROUNDABOUT}
 
     normalCrossRoads = groupNearbyCrossRoads(normalCrossRoads, groupingRadius)
+   
+    normalCrossRoads = {point: properties for point, properties in normalCrossRoads.items() if not len(properties.streetNames) == 1}
+
     # as roundAbouts can have quite a large radius
     roundAboutCrossRoads = groupNearbyCrossRoads(roundAboutCrossRoads, 30) 
 
@@ -96,17 +99,17 @@ def regardRoundabouts(crossRoads, roundAboutStreets):
             otherProperties = result.pop(point, None)
             if otherProperties:
                 properties.union(otherProperties)
-                properties.edgeCount += otherProperties.edgeCount
+        properties.computeEdgeCount()
         result[roundAboutCenter] = properties
             
     # as this mutates the input
     return result
 
 def groupNearbyCrossRoads(crossRoads, radius):
-    """ using UTM coords for metric distance """
-
-    # TODO: combine with streetName based approach maybe? (bigger junctions not working properly)
-    #       higher radius and then combine with streetName based approach at component lvl ?
+    """ 
+    using UTM coords for metric distance 
+    and also setting the edgeCount for every CrossRoad
+    """
 
     shapelyPoints = []
     graph = nx.Graph()
@@ -133,29 +136,10 @@ def groupNearbyCrossRoads(crossRoads, radius):
 
         center = tuple(sMultiPoint(list(crossRoadLocations)).centroid.coords[0])
         newProperties = CrossRoadProperties()
-        junctionTypes = set([props.junctionType for props in nearbyCrossRoads.values()])
+
         for oldProp in nearbyCrossRoads.values():
-            # TODO: do not union different crossRoad Types!
-            # TODO: fix round about edge Count (+ edgeCount - common streets)
-            # edgeCount -> roundabout (+ 1 for each crossRoad if edgeCount > 2)
-            # using continuing streets
             newProperties.union(oldProp)
-            commonStreets = len(oldProp.streetNames.intersection(newProperties.streetNames))
-            if JunctionType.ROUNDABOUT in junctionTypes:
-                # ensure to only include exit-point of round-about
-                if oldProp.edgeCount > 2:
-                    # each crossRoad is an exit of the whole round about
-                    newProperties.edgeCount += 1
-            else:
-                # approximate edgeCount, can lead to overestimations (street segments between crossRoad points of a bigger junction)
-                newProperties.edgeCount = newProperties.edgeCount + oldProp.edgeCount - commonStreets
-        if not JunctionType.ROUNDABOUT in junctionTypes:
-            if newProperties.edgeCount <= 2:
-                newProperties.edgeCount = len([name for name in newProperties.streetNames if not name.startswith("osm-id:")]) * 2
-            else:
-                newProperties.edgeCount = min(newProperties.edgeCount, len(newProperties.streetNames) * 2)
-        else:
-            newProperties.junctionType = JunctionType.ROUNDABOUT
+        newProperties.computeEdgeCount()
         result[center] = newProperties
     return result
 
@@ -174,15 +158,52 @@ class CrossRoadProperties:
     # for debugging purpose
     endingStreets: list =  field(default_factory=list)
     continuingStreets: list =  field(default_factory=list)
+    # to get how many where grouped
+    osmCrossRoads: int = 1
 
     def asdict(self):
         return {k:v
-                for k,v in self.__dict__.items() if not k in ["endingStreets", "continuingStreets"]}
+                for k,v in self.__dict__.items() if not k in ["endingStreets", "continuingStreets", "osmCrossRoads"] or logging.getLogger().level == logging.DEBUG}
     
     def union(self, properties):
+        """union all except junction type and edgeCount"""
         if not isinstance(properties, CrossRoadProperties):
             raise ValueError("expected a CrossRoadProperties object but was {}".format(type(properties)))
         self.streetNames.update(properties.streetNames)
         self.streetTypes.update(properties.streetTypes)
+        self.endingStreets += properties.endingStreets
+        self.continuingStreets += properties.continuingStreets
+        self.osmCrossRoads += properties.osmCrossRoads
+
+        if properties.junctionType == JunctionType.ROUNDABOUT:
+            self.junctionType = JunctionType.ROUNDABOUT
+
+        return None
+
+    def computeEdgeCount(self):
+        """computing the edgeCount based on the continuing and ending streets"""
+        streets = set(self.endingStreets + self.continuingStreets)
+        if self.junctionType == JunctionType.ROUNDABOUT:
+            streets = [s for s in self.endingStreets if not s.startswith("osm-id:")]
+        edgeCount = 0
+        for street in streets:
+            # TODO: how to detect some exotic crossRoads which only have one street?
+            # each street can be at maximum 2 times an edge of a crossRoad
+            countInEndingStreets = len([s for s in self.endingStreets if s == street])
+
+            # for roundabouts only count ending streets (streets inside the roundabout do not count)
+            if self.junctionType == JunctionType.ROUNDABOUT:
+                continuingStreets = []
+            else:
+                continuingStreets = self.continuingStreets
+            
+            countInEndingStreets = len([s for s in self.endingStreets if s == street])
+
+            if street in continuingStreets or countInEndingStreets > 1:
+                edgeCount += 2
+            else:
+                edgeCount += 1
+        
+        self.edgeCount = edgeCount
 
         return None
