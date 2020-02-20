@@ -6,11 +6,15 @@ Examples maps produced by the scripts explained in the following can be found [h
 Each map has a layer control at the upper right, where you can enable and disable individual layers as well as changing the base-tiles.
 
 1. [Content/Scripts](#contentscripts)
+  1.1 [BuildingComplexes](#buildingcomplexes)
+  1.2 [City Patterns](#city-patterns) 
 2. [Getting started](#getting-started)    
 3. [Package dependency](#package-dependency)         
 4. [Further ideas](#further-ideas)
 
 ## Content/Scripts
+
+### BuildingComplexes
 The simplest script is the `urbanDataMap` which just fetches relevant openstreetmap data and visualizes it in a map. 
 At the beginning the idea was group buildings and find building regions, which can be seen in the `buildingComplexes.py` script.
 Resulting are building-groups (buildings having at least one common point) and building-regions (building-groups not being further apart then 120 meters and having no street in between).
@@ -28,8 +32,8 @@ The describtion of the individual objects is based on the annotaters executed in
 The most properties should be self explaining, otherwise you can look at the regarding annotator.
 Regarding the _buildingArea_ property, _Total area in m2_ is a calculated by _ground area * levels_.  
 
-
-At last there is the `cityPatterns` script, which uses the results from the `buildingComplexes` script and tries to find patterns as described by Christoph Alexander in `A Pattern-Language`.
+### City Patterns
+The `cityPatterns` script uses the results from the `buildingComplexes` script and tries to find patterns as described by Christoph Alexander in `A Pattern-Language`.
 Besides his patterns, which were also partly modified, also others can be found in the map. 
 The patterns are visualized simply by highlithing the corresponding objects, but also Voronoi-Diagrams and TimeMaps exists, to show the coverage (f.i. public transport stops are have a 5-Minute-Walk area).
 
