@@ -3,7 +3,9 @@
 This project was created as part of the `Urban Data Seminar` at the TU Dresden.
 It fetches data mostly from openstreetmap, but also from other sources as dvb for public transport, [TravelTime](https://app.traveltimeplatform.com/) for time maps and yellow pages as well as the handelsregister for additional data regarding companies. 
 Examples maps produced by the scripts explained in the following can be found [here](example_maps/).
+Each map has a layer control at the upper right, where you can enable and disable individual layers as well as changing the base-tiles.
 
+## Content/Scripts
 The simplest script is the `urbanDataMap` which just fetches relevant openstreetmap data and visualizes it in a map. 
 At the beginning the idea was group buildings and find building regions, which can be seen in the `buildingComplexes.py` script.
 Resulting are building-groups (buildings having at least one common point) and building-regions (building-groups not being further apart then 120 meters and having no street in between).
@@ -16,6 +18,10 @@ Overlapping regions exist only visually as the convex hull of the shapes are use
 ![Image of a building map](images/buildingMap.png)
 
 For more images of a building map see [here](images/)
+
+The describtion of the individual objects is based on the annotaters executed in the script.
+The most properties should be self explaining, otherwise you can look at the regarding annotator.
+Regarding the _buildingArea_ property, _Total area in m2_ is a calculated by _ground area * levels_.  
 
 
 At last there is the `cityPatterns` script, which uses the results from the `buildingComplexes` script and tries to find patterns as described by Christoph Alexander in `A Pattern-Language`.
@@ -41,7 +47,7 @@ The city-pattern map includes the following layers:
   * Row houses are houses with more than 1 address here (as rowhouses are partly mapped in openstreetmap as one large building)
 * Cross Roads:
   * T-CrossRoads (Pattern 50): Crossroads with exactly 3 edges
-  * All CrossRoads: classified by their number of edges
+  * All CrossRoads: grouped by their an estimation of their number of edges
   * Roundabouts: as a possibly new pattern
 * Night Life (Pattern 33):
   * classified based on their amenity tag in openstreet map (allowing bars, nightclubs and pubs)
