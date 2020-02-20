@@ -62,11 +62,10 @@ def getCrossRoads(streets, groupingRadius = 15):
         properties.computeEdgeCount()
     
      # filter crossRoads for real ones (just changing street-names or a road splitting into 2 lanes does not count)
-    normalCrossRoads = {c: prop for c, prop in crossRoads.items() if not (
-        prop.junctionType == JunctionType.ROUNDABOUT and properties.edgeCount > 2 or properties.streetTypes == {"service"})}
+    normalCrossRoads = {c: props for c, props in crossRoads.items() if props.junctionType == JunctionType.NORMAL and not (props.edgeCount > 2 or props.streetTypes == {"service"})}
 
-    roundAboutCrossRoads = {c: prop for c, prop in crossRoads.items(
-    ) if prop.junctionType == JunctionType.ROUNDABOUT}
+    roundAboutCrossRoads = {c: props for c, props in crossRoads.items(
+    ) if props.junctionType == JunctionType.ROUNDABOUT}
 
     normalCrossRoads = groupNearbyCrossRoads(normalCrossRoads, groupingRadius)
    
