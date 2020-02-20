@@ -5,6 +5,11 @@ It fetches data mostly from openstreetmap, but also from other sources as dvb fo
 Examples maps produced by the scripts explained in the following can be found [here](example_maps/).
 Each map has a layer control at the upper right, where you can enable and disable individual layers as well as changing the base-tiles.
 
+1. [Content/Scripts](#contentscripts)
+2. [Getting started](#getting-started)    
+3. [Package dependency](#package-dependency)         
+4. [Further ideas](#further-ideas)
+
 ## Content/Scripts
 The simplest script is the `urbanDataMap` which just fetches relevant openstreetmap data and visualizes it in a map. 
 At the beginning the idea was group buildings and find building regions, which can be seen in the `buildingComplexes.py` script.
@@ -85,8 +90,6 @@ If you change the city you should note the following:
  
 
 ## Package dependency 
-
-### For scripts in main directory) 
 
 Visualization:
 - [folium](https://github.com/python-visualization/folium) (fronted/map visualization)
