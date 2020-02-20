@@ -242,6 +242,11 @@ if __name__ == "__main__":
     ))
 
     crossRoads, roundAbouts = getCrossRoads(streets)
+
+    logging.info("Grouping nearby crossroads")
+    crossRoads = groupNearbyCrossRoads(crossRoads, 15)
+    # as roundAbouts can have quite a large radius
+    roundAbouts = groupNearbyCrossRoads(roundAbouts, 30) 
     crossRoadsByEdgeCount = groupBy(crossRoads, lambda props: props["edgeCount"] if props["edgeCount"] < 6 else ">= 6")
 
     pattern = "T-CrossRoads (Pattern 50)"

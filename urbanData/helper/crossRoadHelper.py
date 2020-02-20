@@ -12,11 +12,10 @@ from helper.coordSystemHelper import distance, wgsToUtm, utmToWgs
 from helper.geoJsonHelper import lineToPolygon
 
 
-def getCrossRoads(streets, groupingRadius = 15):
+def getCrossRoads(streets):
     """  
     Excludes crossRoads between service roads and ones with only one street name.
-    Groups nearby crossRoads given by groupingRadius.
-    Groups roundAbout crossRoads by a fixed radius currently.
+    Returns 2 dicts location->crossroad-properties (first for normal, second for roundAbouts)
     """
     streetNodeIndex = defaultdict(lambda: CrossRoadProperties())
     streets = streets["features"]
@@ -62,19 +61,20 @@ def getCrossRoads(streets, groupingRadius = 15):
         properties.computeEdgeCount()
     
      # filter crossRoads for real ones (just changing street-names or a road splitting into 2 lanes does not count)
-    normalCrossRoads = {c: props for c, props in crossRoads.items() if props.junctionType == JunctionType.NORMAL and not (props.edgeCount > 2 or props.streetTypes == {"service"})}
+    normalCrossRoads = {c: props for c, props in crossRoads.items() if props.junctionType == JunctionType.NORMAL and props.edgeCount > 2 and not props.streetTypes == {"service"}}
 
-    roundAboutCrossRoads = {c: props for c, props in crossRoads.items(
-    ) if props.junctionType == JunctionType.ROUNDABOUT}
+    roundAboutCrossRoads = {
+        c: props for c, props in crossRoads.items() if props.junctionType == JunctionType.ROUNDABOUT
+    }
 
-    normalCrossRoads = groupNearbyCrossRoads(normalCrossRoads, groupingRadius)
-   
-    normalCrossRoads = {point: properties for point, properties in normalCrossRoads.items() if not len(properties.streetNames) == 1}
+    normalCrossRoads = {point: props for point, props in normalCrossRoads.items() if len(props.streetNames) > 1 or containsPlace(props.streetNames)}
 
-    # as roundAbouts can have quite a large radius
-    roundAboutCrossRoads = groupNearbyCrossRoads(roundAboutCrossRoads, 30) 
+    return normalCrossRoads, roundAboutCrossRoads
 
-    return crossRoadsToFeatures(normalCrossRoads), crossRoadsToFeatures(roundAboutCrossRoads)
+def containsPlace(streetNames):
+    # Problem: Fritz-Foerster-Platz every street changes its name to it before the actual crossroad
+    # TODO: make this language agnostic?
+    return [name for name in streetNames if "platz" in name.lower()]
 
 def crossRoadsToFeatures(crossRoads):
     geoJsonFeatures = []
@@ -98,7 +98,6 @@ def regardRoundabouts(crossRoads, roundAboutStreets):
             otherProperties = result.pop(point, None)
             if otherProperties:
                 properties.union(otherProperties)
-        properties.computeEdgeCount()
         result[roundAboutCenter] = properties
             
     # as this mutates the input
@@ -106,6 +105,7 @@ def regardRoundabouts(crossRoads, roundAboutStreets):
 
 def groupNearbyCrossRoads(crossRoads, radius):
     """ 
+    crossRoads as a geojson feature collection
     using UTM coords for metric distance 
     and also setting the edgeCount for every CrossRoad
     """
@@ -140,7 +140,7 @@ def groupNearbyCrossRoads(crossRoads, radius):
             newProperties.union(oldProp)
         newProperties.computeEdgeCount()
         result[center] = newProperties
-    return result
+    return crossRoadsToFeatures(result)
 
 
 class JunctionType(Enum):
@@ -162,7 +162,7 @@ class CrossRoadProperties:
 
     def asdict(self):
         return {k:v
-                for k,v in self.__dict__.items() if not k in ["endingStreets", "continuingStreets", "osmCrossRoads"] or logging.getLogger().level == logging.DEBUG}
+                for k,v in self.__dict__.items() if not k in ["endingStreets", "continuingStreets"] or logging.getLogger().level == logging.DEBUG}
     
     def union(self, properties):
         """union all except junction type and edgeCount"""
@@ -183,10 +183,10 @@ class CrossRoadProperties:
         """computing the edgeCount based on the continuing and ending streets"""
         streets = set(self.endingStreets + self.continuingStreets)
         if self.junctionType == JunctionType.ROUNDABOUT:
-            streets = [s for s in self.endingStreets if not s.startswith("osm-id:")]
+            streets = [s for s in streets if not s.startswith("osm-id:")]
         edgeCount = 0
         for street in streets:
-            # TODO: how to detect some exotic crossRoads which only have one street?
+            # TODO: how to allow some exotic crossRoads which only have one street?
             # each street can be at maximum 2 times an edge of a crossRoad
             countInEndingStreets = len([s for s in self.endingStreets if s == street])
 
@@ -195,13 +195,17 @@ class CrossRoadProperties:
                 continuingStreets = []
             else:
                 continuingStreets = self.continuingStreets
-            
-            countInEndingStreets = len([s for s in self.endingStreets if s == street])
 
             if street in continuingStreets or countInEndingStreets > 1:
                 edgeCount += 2
             else:
                 edgeCount += 1
+
+        # getting crossroads in places like Fritz-Foerster-Platz
+        # filtering points where just a "place" street continues (f.i. Wiener Platz)
+        if containsPlace(streets) and edgeCount == 2 and not len(self.endingStreets + self.continuingStreets) == 1 :
+            # just an estimation
+            edgeCount = 4  
         
         self.edgeCount = edgeCount
 
