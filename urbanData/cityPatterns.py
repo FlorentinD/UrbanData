@@ -15,8 +15,6 @@ import geojson
 import re
 from collections import OrderedDict
 
-# TODO: restructure into functions for pattern group
-
 # set to DEBUG for more logging a more verbous describtion for some objects
 logging.basicConfig(level=logging.DEBUG)
 overpassFetcher = OverPassHelper()
@@ -373,8 +371,10 @@ if __name__ == "__main__":
     fitnessCentreQuery = OsmDataQuery("Local Sport", OsmObjectType.ALL, ['"leisure"~"fitness_centre"'])
     osmResult = overpassFetcher.directFetch(dresdenAreaId, [sportsQuery, fitnessCentreQuery])
     sports = next(osmResult)
+    sportsPerTypeOfPlace = groupBy(sports, lambda x: x.get("leisure", "not specified")) 
     fitnessCentres = next(osmResult)
-    geoFeatureCollectionToFoliumFeatureGroup(sports, 'green', pattern, show= False).add_to(map)
+    generateFeatureCollectionForGroups(sportsPerTypeOfPlace, ["#33cc33", "#990000"], pattern, show=False).add_to(map)
+    #geoFeatureCollectionToFoliumFeatureGroup(sports, 'green', pattern, show= False).add_to(map)
     #geoFeatureCollectionToFoliumFeatureGroup(fitnessCentres, 'brown', "FitnessCentres (also sports)", show=False).add_to(map)
     # alternatives: leisure=sports_centre|stadium|track|pitch|horse_riding|swimming_pool|recreation_ground|golf_course
     #       or club=sport
