@@ -22,6 +22,9 @@ class BuildingType(Enum):
     STORAGE = "storage"
 
 class BuildingTypeClassifier(BaseAnnotator):
+    """
+    Classifier for buildings based on various properties (also checking for properties written by other annotaters)
+    """
     def __init__(self):
         self.writeProperty = "type"
 
@@ -106,7 +109,9 @@ class BuildingTypeClassifier(BaseAnnotator):
         return list(set().union(*types))
 
 class LandUseAnnotator(OsmAnnotator):
-    """try to fill missing type info based on landuse"""
+    """
+    try to fill missing type info based on landuse
+    """
     osmSelector = ["landuse"]
     writeProperty = "__landUseType"
 

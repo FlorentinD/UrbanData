@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from geojson import FeatureCollection
 import logging
+from funcy import log_durations
 
 class BaseAnnotator():
     """Base Class for annotaters of geojson-objects
@@ -16,14 +17,18 @@ class BaseAnnotator():
     def __init__(self, dataSource, writeProperty):
         self.dataSource = dataSource
         self.writeProperty = writeProperty
-
+        
+    @log_durations(logging.debug)
     def annotateAll(self, objects):
-        """annotates a geojson-featureCollection"""
+        """annotate() for every feature of the objects geojson-featureCollection"""
         annotatedFeatures = [self.annotate(object) for object in objects["features"]]
         return FeatureCollection(annotatedFeatures)
 
     @abstractmethod
     def annotate(self, object):
+        """
+            annotating an object (normally with the self.writeProperty)
+        """
        raise NotImplementedError(__name__)
 
     @staticmethod
@@ -32,6 +37,12 @@ class BaseAnnotator():
        raise NotImplementedError(__name__)
 
     def aggregate(self, buildings, groups, foreignKey, aggregateFunc):
+        """
+            buildings: "base data" as a geojson-FeatureCollection
+            groups: feature referencing multiple base data in the foreignKey
+            foreignKey: mapping groups to list of buildings
+            aggregateFunc: function for aggregating properties from buildings into one for the group
+        """
         groupFeatures = groups["features"]
         buildingFeatures = buildings["features"]
         for group in groupFeatures:

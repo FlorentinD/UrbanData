@@ -52,8 +52,6 @@ class CompanyAnnotator(BaseAnnotator):
     # TODO: move annotate method
     def annotateAll(self, buildings):
         """adds companies by matching addresses"""
-        # overwrites method, as 
-        # TODO: map companies to building: {name, branch, number of entrances (for relative area of building later on)}
         # TODO: loop over buildings first? (would not need to overwrite annotateAll)
         
         # TODO: replace this nested loop join (extract join condition)

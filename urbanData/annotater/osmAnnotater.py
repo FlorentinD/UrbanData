@@ -14,6 +14,9 @@ from helper.geoJsonConverter import osmObjectsToGeoJSON
 from helper.OsmObjectType import OsmObjectType
 
 class OsmAnnotator(BaseAnnotator):
+    """
+    Base class for annotaters using osm data
+    """
     osmSelector = None 
     shapeIndex = None 
     def __init__(self, areaName: str, elementsToUse: OsmObjectType = OsmObjectType.NODE):

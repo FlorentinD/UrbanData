@@ -30,6 +30,12 @@ def osmObjectsToGeoJSON(osmObjects, polygonize = False):
 
 
 def osmToGeoJsonGeometry(object, polygonize):
+    """
+        generating a geojson geometry based on the osm-object
+
+        object: osm object (from overpass-request with out:geom)
+        polygonize: boolean, whether each way should be tried to transfrom to a polygon (without regarding its tags)
+    """
     if object["type"] == "relation":
             relMembers = object["members"]
             outerGeometries = [osmToGeoJsonGeometry(m, polygonize) for m in relMembers if m['role'] in ["outer",'', 'outline']]
@@ -73,6 +79,13 @@ def osmToGeoJsonGeometry(object, polygonize):
         return geojson.Point(points[0], validate=True)
 
 def tryToConvertToPolygon(tags, lines, polygonize, isMultiPolygon = False):
+    """
+        Creates a Polygon or LineString based on the given lines
+        tags: tags of the base object
+        lines: coordinates (basically nested lists)
+        polygonize: boolean, if True -> tries to convert every Line to Polygon
+        isMultiPolygon: boolean, if each line is an extra polygon else lines = [boundary, holes..]
+    """
     # as sometimes tags like "area":"no" exists, which are obviously no polygons
     tags = {tag: v for tag, v in tags.items() if not v == "no"}
 
@@ -130,5 +143,6 @@ def transformToBoundaryLine(lines):
     
 
 def shapeGeomToGeoJson(shape, properties = None):
+    """converts a shaply geometry to a geojson Feature"""
     geometry = mapping(shape)
     return geojson.Feature(geometry=geometry, properties=properties)

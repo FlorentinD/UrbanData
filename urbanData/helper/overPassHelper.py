@@ -26,6 +26,9 @@ class OverPassHelper:
         return nominatim.query(locationName).areaId()
 
     def getOsmGeoObjects(self, areaId, selector, elementType:OsmType):
+        """
+        sends overpass-query and return the elements from the json response
+        """
         overpass = Overpass()
         # out='geom' also leads to geometry key (list of coordinates for each object)
 
