@@ -15,10 +15,10 @@ Each map has a layer control at the upper right, where you can enable and disabl
 ## Content/Scripts
 
 ### BuildingComplexes
-The simplest script is the `urbanDataMap` which just fetches relevant openstreetmap data and visualizes it in a map. 
-At the beginning the idea was group buildings and find building regions, which can be seen in the `buildingComplexes.py` script.
+The simplest script is the [`urbanDataMap.py`](urbanData/urbanDataMap.py) which just fetches relevant openstreetmap data and visualizes it in a map. 
+At the beginning the idea was group buildings and find building regions, which can be seen in the [`buildingComplexes.py`](urbanData/buildingComplexes.py) script.
 Resulting are building-groups (buildings having at least one common point) and building-regions (building-groups not being further apart then 120 meters and having no street in between).
-As the data from openstreetmap is not complete, f.i. many buildings are just tagges as _yes_, an additional building-type is introduced (see `annotater/buildingClassifier.py`).
+As the data from openstreetmap is not complete, f.i. many buildings are just tagges as _yes_, an additional building-type is introduced (see [`annotater/buildingClassifier.py`](urbanData/annotater/buildingClassifier.py)).
 There are several other properties annotated as seen in the `annotater` package.
 Currently the analysis is only done over Pieschen.
 Note that regions only contain the buildings and not the space inbetween (regarding area and shape).
@@ -33,7 +33,7 @@ The most properties should be self explaining, otherwise you can look at the reg
 Regarding the _buildingArea_ property, _Total area in m2_ is a calculated by _ground area * levels_.  
 
 ### City Patterns
-The `cityPatterns` script uses the results from the `buildingComplexes` script and tries to find patterns as described by Christoph Alexander in `A Pattern-Language`.
+The [`cityPatterns.py`](urbanData/cityPatterns.py) script uses the results from the `buildingComplexes` script and tries to find patterns as described by Christoph Alexander in `A Pattern-Language`.
 Besides his patterns, which were also partly modified, also others can be found in the map. 
 The patterns are visualized simply by highlithing the corresponding objects, but also Voronoi-Diagrams and TimeMaps exists, to show the coverage (f.i. public transport stops are have a 5-Minute-Walk area).
 
@@ -84,11 +84,11 @@ The current scripts are for Dresden.
 Executing the scripts for the first time can take quite a while as many data from openstreetmap needs to be pulled (responses will be cached, so subsequent execution will be faster).
 
 If you change the city you should note the following:
-* ! Be sure when executing the scripts to be inside the `urbanData` folder (otherwise there may be problems finding helper and annotater classes)
+* Be sure when __executing the scripts__ to be __inside the [`urbanData`](/urbanData) folder__ (otherwise there may be problems finding helper and annotater classes)
 * The tags the analysis is based on may have different meanings and/or values if you change the city 
 * The scraped company data for Dresden is uploaded. For other cities they need to be scraped by yourself.
 * If you want to include data for the public transport you need to find a corresponding API as dvb will probably not work. 
-* If you want to build your own time maps (`timeMapRetriever.py` might be a good starting point), you will need your own API-KEY!
+* If you want to build your own time maps ([`timeMapRetriever.py`](urbanData/timeMapRetriever.py) might be a good starting point), you will need your own __API-KEY__
 * You may notice the introduced pauses, which are introduced to respect the allowed request per minute limit for the free usage of TimeMaps.
 
  
