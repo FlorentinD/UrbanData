@@ -132,4 +132,4 @@ Util:
 * use streamlit for an interactive web app (allowing to interactivly add voronoi layers f.i.)
 * write way more tests
 * improve housenumber recognition out of an address
-* improve crossroads edgeCount estimation
+* improve crossroads edgeCount estimation (or use OSMnx for getting crossroads)
