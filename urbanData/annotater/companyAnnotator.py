@@ -8,13 +8,11 @@ from annotater.osmAnnotater import AddressAnnotator
 
 class CompanyAnnotator(BaseAnnotator):
     """Annotates objects (probably buildings) with companies based on address information"""
-
+    # companies based on osm are added by the OsmCompaniesAnnotator
     writeProperty = "companies"
     dataSource = []
 
-    defaultDataSources = ["handelsregister_Dresden", "yellowPages_Dresden"]
-
-    # TODO: also insert osmCompanies (or similar to companies like crafts)
+    defaultDataSources = ["handelsregister_Dresden", "yellowPages_Dresden"] 
 
     def __init__(self, companyData = None, postalCodes = ["01127", "01139"]):
         """companyData as pandasDf else default to result of companyScraper""" 
