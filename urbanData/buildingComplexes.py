@@ -9,7 +9,7 @@ from funcy import log_durations
 
 
 from shapely.geometry import Polygon, LineString, mapping, shape, MultiPolygon
-from shapely.ops import unary_union, transform
+from shapely.ops import unary_union, transform, nearest_points
 from shapely.strtree import STRtree
 from OSMPythonTools.nominatim import Nominatim
 
@@ -57,9 +57,6 @@ def buildGroups(buildings):
     for id, indexes in enumerate(buildingComponents):
         buildingGeometries = [allBuildingsShapeGeom[index] for index in indexes]
         groupShape = unary_union(buildingGeometries)
-        # TODO: properly support MultiPolygons in geoJsonToFolium
-        #if isinstance(groupShape, MultiPolygon):
-        #    groupShape = groupShape.convex_hull
         buildingIds = list(indexes)
 
         buildingGroup = shapeGeomToGeoJson(groupShape, properties={
@@ -75,10 +72,51 @@ def buildGroups(buildings):
 
     return geojson.FeatureCollection(buildingGroups)
 
+
+def componentsToRegions(regionComponents, buildingGroupGraph, buildingGroups, name):
+    """
+        graph components to regions (as a FeatureCollection)
+    """
+    buildingRegions = []
+    for id, groupIds in enumerate(regionComponents):
+        groupsForRegion = [buildingGroups["features"][index] for index in groupIds]
+        groupForRegionGeometries = [shape(group["geometry"]) for group in groupsForRegion] 
+        regionShape = unary_union(groupForRegionGeometries).convex_hull
+        # TODO: use saved streets for this regions (for refining geometry) .. not only convex hull
+        # use shapely.ops.split for this (only works if street completly splits the polygon ... maybe union border shape before)
+        # only take geometry containing every building? 
+        borderIndexes = set.union(*[buildingGroupGraph.node[index]['borders'] for index in groupIds])
+        regionBorders = [
+            borders["features"][index]["properties"].get(
+                "name",
+                borders["features"][index]["properties"].get(
+                    "ref",
+                    "border{}".format(index)
+                )) for index in borderIndexes]
+        # removes duplicate street names (as streets often segmented by crossings)
+        regionBorders = list(set(regionBorders))
+        groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
+
+        region = shapeGeomToGeoJson(regionShape, properties={
+            "regionId": id, 
+            "__buildingGroups": groupIds, 
+            "regionBorders": regionBorders
+        })
+        buildingRegions.append(region)
+
+        for group in groupsForRegion:
+            group["properties"][name + "regionId"] = id 
+
+    logging.info("Building Regions based on {}: {}".format(name, len(buildingRegions)))
+    return geojson.FeatureCollection(buildingRegions)
+
+
 @log_durations(logging.debug)
 def buildRegions(buildingGroups, borders, maxGroupDistance = 120):
     """
     buildingGroup expansion: if no borders inbetween and closer than maxGroupDistance -> union groups
+
+    returns a map of region-building-approach: geojsonFeatureCollection
     """
 
     buildingGroupGeoShapes = [withUTMCoord(shape(building["geometry"])) for building in buildingGroups["features"]] 
@@ -103,18 +141,20 @@ def buildRegions(buildingGroups, borders, maxGroupDistance = 120):
     added_edges = 0
     for bShape in buildingGroupGeoShapes:
         index = bShape.id
-        if((index + 1) % 200 == 0 and not index == 0):
+        if((index + 1) % 500 == 0 and not index == 0):
             logging.info("Progress: {}/{} ; {} edges added".format(
                 index + 1, len(buildingGroupGeoShapes), added_edges))
             added_edges = 0
 
+        # buffer seems to be different to a circle (more like a rectangle possibly)
         nearbyBuildingGroups = buildingGroupIndex.query(bShape.buffer(maxGroupDistance))
         for otherBShape in nearbyBuildingGroups:
             otherIndex = otherBShape.id
-            center = bShape.centroid.coords[0]
-            # TODO: use not only center for group but center from each building
-            otherCenter = otherBShape.centroid.coords[0]
-            connection = LineString(coordinates=[center, otherCenter])
+            connection = LineString(coordinates= nearest_points(bShape, otherBShape))
+
+            if connection.length > maxGroupDistance or otherIndex == index:
+                # false positive retrieval from R-tree ? (as buffer creates no circle)       
+                continue
 
             crossesStreet = None
             potentialBorders = bordersIndex.query(connection)
@@ -126,46 +166,29 @@ def buildRegions(buildingGroups, borders, maxGroupDistance = 120):
 
             if crossesStreet == None:
                 added_edges += 1
-                buildingGroupGraph.add_edge(index, otherIndex)
+                # the closer, the more likely they are in the same component
+                weight = 1 - connection.length / maxGroupDistance
+                buildingGroupGraph.add_edge(index, otherIndex, distance = weight)
             else:
                 buildingGroupGraph.node[index]['borders'].add(
                     crossesStreet)
                 buildingGroupGraph.node[otherIndex]['borders'].add(
                     crossesStreet)
 
-    regionComponents = nx.connected_components(buildingGroupGraph)
+    logging.info("Added in total: {} edges".format(buildingGroupGraph.number_of_edges()))
 
-    buildingRegions = []
-    for id, groupIds in enumerate(regionComponents):
-        groupsForRegion = [buildingGroups["features"][index] for index in groupIds]
-        groupForRegionGeometries = [shape(group["geometry"]) for group in groupsForRegion] 
-        # TODO: use saved streets for this regions (for refining geometry) (find method for refinement)
-        regionShape = unary_union(groupForRegionGeometries).convex_hull
+    logging.info("Executing community detection algos")
+    regionBuildingApproaches = {
+        "modularity_greedy": nx.algorithms.community.greedy_modularity_communities(buildingGroupGraph),
+        #"label_propagation": nx.algorithms.community.asyn_lpa_communities(buildingGroupGraph),
+        "weighted_label_propagation": nx.algorithms.community.asyn_lpa_communities(buildingGroupGraph, weight="distance"),
+        "wcc": nx.connected_components(buildingGroupGraph)
+    }
 
-        borderIndexes = set.union(*[buildingGroupGraph.node[index]['borders'] for index in groupIds])
-        regionBorders = [
-            borders["features"][index]["properties"].get(
-                "name",
-                borders["features"][index]["properties"].get(
-                    "ref",
-                    "border{}".format(index)
-                )) for index in borderIndexes]
-        # remove duplicate street names (as streets often segmented by crossings)
-        regionBorders = list(set(regionBorders))
-        groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
-
-        region = shapeGeomToGeoJson(regionShape, properties={
-            "regionId": id, 
-            "__buildingGroups": groupIds, 
-            "regionBorders": regionBorders
-        })
-        buildingRegions.append(region)
-
-        for group in groupsForRegion:
-            group["properties"]["regionId"] = id 
-
-    logging.info("Building Regions: {}".format(len(buildingRegions)))
-    return geojson.FeatureCollection(buildingRegions)
+    logging.info("Building region feature collections")
+    regionFeatureGroups = {name: componentsToRegions(components, buildingGroupGraph, buildingGroups, name) for name, components in regionBuildingApproaches.items()}
+    return regionFeatureGroups
+    
 
 def buildGroupsAndRegions(buildings, borders):
     groups = buildGroups(buildings)
@@ -177,7 +200,7 @@ def getPolygonArea(building):
     buildingWithUTM = withUTMCoord(building)
     return round(buildingWithUTM.area)
 
-def annotateArea(buildings, groups, regions):
+def annotateArea(buildings, groups, regions, approachName):
     """based on number of levels of buildings"""
     BUILDINGAREA_KEY = "buildingArea"
     # TODO: rewrite as annotater
@@ -191,7 +214,7 @@ def annotateArea(buildings, groups, regions):
             avgGroupLevel = groups["features"][groupId]["properties"]["levels"]
             buildingLevels = round(avgGroupLevel)
             if not avgGroupLevel:
-                regionId = groups["features"][groupId]["properties"]["regionId"]
+                regionId = groups["features"][groupId]["properties"][approachName + "regionId"]
                 avgRegionLevel = regions["features"][regionId]["properties"]["levels"]
                 buildingLevels = round(avgRegionLevel)
                 if not avgRegionLevel:
@@ -261,7 +284,7 @@ if __name__ == "__main__":
         # Poor Mans Testing
         #buildings = geojson.FeatureCollection(buildings["features"][:200])
         logging.info("Fetched {} buildings".format(len(buildings["features"])))
-        groups, regions = buildGroupsAndRegions(buildings, borders)
+        groups, regionsPerApproach = buildGroupsAndRegions(buildings, borders)
     else:
         logging.info("Loading buildings, groups and regions")
         # TODO: index seems to be messed up when loading?
@@ -270,7 +293,7 @@ if __name__ == "__main__":
         with open("out/data/buildingGroups_pieschen.json", encoding='UTF-8') as file:
             groups = json.load(file)
         with open("out/data/buildingRegions_pieschen.json", encoding='UTF-8') as file:
-            regions = json.load(file)
+            regionsPerApproach = {"loaded regions": json.load(file)}
 
     # !! Change for other regions
     postalCodes = ["01127", "01139"]
@@ -292,9 +315,11 @@ if __name__ == "__main__":
         logging.info("Starting {}".format(annotator.__class__.__name__))
         buildings = annotator.annotateAll(buildings)
         groups = annotator.aggregateToGroups(buildings, groups)
-        regions = annotator.aggregateToRegions(groups, regions)
+        for _, regions in regionsPerApproach.items():
+            regions = annotator.aggregateToRegions(groups, regions)
     
-    annotateArea(buildings, groups, regions)
+    for name, regions in regionsPerApproach.items():
+        annotateArea(buildings, groups, regions, name)
 
     logging.info("save complexes and regions")
 
@@ -303,7 +328,7 @@ if __name__ == "__main__":
     with open("out/data/buildingGroups_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(groups, outfile)
     with open("out/data/buildingRegions_pieschen.json", 'w', encoding='UTF-8') as outfile:
-            geojson.dump(regions, outfile)
+            geojson.dump(regionsPerApproach.get("wcc", list(regionsPerApproach.values())[0]), outfile)
 
 
     ######### Visual 
@@ -334,8 +359,16 @@ if __name__ == "__main__":
     buildingGroupsFeature = geoFeatureCollectionToFoliumFeatureGroup(groups, "#cc9900", "building groups")
     buildingGroupsFeature.add_to(map)
 
-    buildingRegionsFeature = geoFeatureCollectionToFoliumFeatureGroup(regions, "#cc3300", "building regions")
-    buildingRegionsFeature.add_to(map)
+    regionColors = {
+        "modularity_greedy": "#009933",
+        "label_propagation": "#660066",
+        "weighted_label_propagation": "#800000",
+        "wcc": "#cc3300"
+    }
+    for name, regions in regionsPerApproach.items():
+        buildingRegionsFeature = geoFeatureCollectionToFoliumFeatureGroup(
+            regions, regionColors[name], "building regions based on " + name, show=name == "wcc")
+        buildingRegionsFeature.add_to(map)
 
     folium.LayerControl().add_to(map)
 
