@@ -131,7 +131,7 @@ def aggregateCategoryGroupProperties(properties):
 class OsmCompaniesAnnotator(OsmAnnotator):
     """adds shops stores in openstreetmap"""
     # TODO: allow to also use crafts tag
-    osmSelector = ['"shop"']
+    osmSelector = ['"shop"', '"name"']
     writeProperty = "companies"
 
     def annotate(self, object):
@@ -141,7 +141,7 @@ class OsmCompaniesAnnotator(OsmAnnotator):
         for shopGeom in nearbyGeoms:
             # assume shops just have one entry ?? 
             properties = shopGeom.properties
-            companyEntry = (properties.get("name", "Not named"), properties.get("shop"), 1)
+            companyEntry = (properties.get("name"), properties.get("shop"), 1)
             if objectGeometry.intersects(shopGeom):
                 # insert into companies
                 if self.writeProperty in object["properties"].keys():
@@ -158,7 +158,7 @@ class OsmCompaniesAnnotator(OsmAnnotator):
 
 
 class AmentiyAnnotator(OsmAnnotator):
-    osmSelector = ["amenity",'"amenity"!~"vending_machine|parking|atm"', 'leisure!~"."']
+    osmSelector = ["amenity",'"amenity"!~"vending_machine|parking|atm"', 'leisure!~"."', "name"]
     writeProperty = "amenities"
     # TODO health and food also in extra category?
 
@@ -172,7 +172,7 @@ class AmentiyAnnotator(OsmAnnotator):
             properties = amenityGeom.properties
             amenityType = properties.get("amenity")
             if objectGeometry.intersects(amenityGeom):
-                entry = (properties.get("name", "Not named"), amenityType, 1)
+                entry = (properties.get("name"), amenityType, 1)
 
                 if amenityType in ["police", "fire_station"]:
                     if "safety" in object["properties"].keys():
@@ -207,7 +207,7 @@ class AmentiyAnnotator(OsmAnnotator):
 
 
 class LeisureAnnotator(OsmAnnotator):
-    osmSelector = ["leisure", 'amenity!~"."']
+    osmSelector = ["leisure", 'amenity!~"."', "name"]
     writeProperty = "leisures"
 
     def annotate(self, object):
@@ -219,7 +219,7 @@ class LeisureAnnotator(OsmAnnotator):
         for leisure in nearbyGeoms:
             if objectGeometry.intersects(leisure):
                 properties = leisure.properties
-                leisureEntry = (properties.get("name", "Not named"), properties.get("leisure"), 1)
+                leisureEntry = (properties.get("name"), properties.get("leisure"), 1)
                 # insert into companies
                 if self.writeProperty in object["properties"].keys():
                     object["properties"][self.writeProperty].append(leisureEntry)
@@ -243,6 +243,11 @@ class EducationAggregator(BaseAnnotator):
         if buildingType in ["school", "kindergarten", "university", "libary"] and not properties.get("amenity"):
             entry = (properties.get("name", "Not named"), buildingType, 1)
             if "education" in properties.keys():
+                existingEntries = properties.get("education")
+                # preventing to have ("XY", kindergarten, 1) and ("Not named", kindergarten, 1)
+                for existingName, existingType, _ in existingEntries:
+                    if existingType == buildingType and entry[1] in ["Not named", existingName]:
+                        return object
                 object["properties"]["education"].append(entry)
             else:
                 object["properties"]["education"] = [entry]
@@ -266,6 +271,11 @@ class SafetyAggregator(BaseAnnotator):
         if buildingType in ["police", "fire_station"] and not properties.get("amenity"):
             entry = (properties.get("name", "Not named"), buildingType, 1)
             if "safety" in properties.keys():
+                existingEntries = properties.get("safety")
+                # preventing to have ("XY", police, 1) and ("Not named", police, 1)
+                for existingName, existingType, _ in existingEntries:
+                    if existingType == buildingType and entry._1 in ["Not named", existingName]:
+                        return object
                 object["properties"]["safety"].append(entry)
             else:
                 object["properties"]["safety"] = [entry]
