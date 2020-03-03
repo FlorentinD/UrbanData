@@ -237,6 +237,7 @@ def annotateArea(buildings, groups, regions):
 logging.basicConfig(level=logging.INFO)
 
 if __name__ == "__main__":
+    overPassFetcher = OverPassHelper()
     areaOfInterest = 'Pieschen, Dresden, Germany'
 
     pieschen = Nominatim().query(areaOfInterest)
@@ -249,7 +250,7 @@ if __name__ == "__main__":
 
     # https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL#By_polygon_.28poly.29 for filtering based on polygon (if borough based on openDataDresden)
     # this query can take a while
-    osmData = OverPassHelper().directFetch(pieschen.areaId(), osmQueries)
+    osmData = overPassFetcher.directFetch(pieschen.areaId(), osmQueries)
 
     buildings = next(osmData)
     borders = unionFeatureCollections(*list(osmData))
@@ -306,11 +307,24 @@ if __name__ == "__main__":
 
 
     ######### Visual 
-    areaName = "pieschen"
-    pieschen = Nominatim().query(areaOfInterest)
+    areaName = "Pieschen"
     pieschenCoord = pieschen.toJSON()[0]
     map = folium.Map(
         location=[51.078875, 13.728524], tiles='Open Street Map', zoom_start=15)
+
+    # as border cannot be found if it is of the areo of interest
+    dresdenAreaId = overPassFetcher.getAreaId("Dresden, Germany")
+
+    areaBorder = next(overPassFetcher.directFetch(
+        dresdenAreaId, 
+        [OsmDataQuery(
+            "Area boundaries", 
+            OsmObjectType.RELATIONSHIP, 
+            ['"boundary"~"administrative"', '"name"~"{}"'.format(areaName)]
+            )
+        ]))
+
+    geoFeatureCollectionToFoliumFeatureGroup(areaBorder, "grey", name="Pieschen").add_to(map)
 
     geoFeatureCollectionToFoliumFeatureGroup(buildings, "black", name="Single buildings").add_to(map)
 

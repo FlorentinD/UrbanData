@@ -29,7 +29,7 @@ class BaseAnnotator():
         """
             annotating an object (normally with the self.writeProperty)
         """
-       raise NotImplementedError(__name__)
+        raise NotImplementedError(__name__)
 
     @staticmethod
     @abstractmethod
