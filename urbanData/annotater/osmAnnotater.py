@@ -138,16 +138,28 @@ class OsmCompaniesAnnotator(OsmAnnotator):
         """based on geojson-object geometry checks if shop are inside of the building"""
         objectGeometry = shape(object["geometry"])
         nearbyGeoms = self.shapeIndex.query(objectGeometry)
+        companyEntries = object["properties"].get(self.writeProperty, [])
+        if isinstance(companyEntries, tuple):
+            companyEntries = [companyEntries]
+
         for shopGeom in nearbyGeoms:
-            # assume shops just have one entry ?? 
             properties = shopGeom.properties
-            companyEntry = (properties.get("name"), properties.get("shop"), 1)
             if objectGeometry.intersects(shopGeom):
-                # insert into companies
-                if self.writeProperty in object["properties"].keys():
-                    object["properties"][self.writeProperty].append(companyEntry)
-                else:
-                    object["properties"][self.writeProperty] = [companyEntry]
+                shopName = properties.get("name")
+                shopType = properties.get("shop")
+                # assuming shops just have one entry .. if not set otherwise previously 
+                entrances = 1
+
+                # preventing to have ("XY", 'various', 1) and ("XY", 'furniture', 1)
+                matchingEntries = [e for e in companyEntries if shopName == e[0]]
+                for matchingName, existingType, existingEntrances in matchingEntries:
+                    companyEntries.remove((matchingName, existingType, existingEntrances))
+                    entrances = existingEntrances
+                    if not existingType == "various":
+                        shopType += "," + existingType
+                # TODO: check based on "Washingtonstrasse 16"
+                companyEntries.append((shopName, shopType, entrances))          
+        object["properties"][self.writeProperty] = companyEntries
         return object
 
     def aggregateProperties(self, buildingProperties):
@@ -220,7 +232,6 @@ class LeisureAnnotator(OsmAnnotator):
             if objectGeometry.intersects(leisure):
                 properties = leisure.properties
                 leisureEntry = (properties.get("name"), properties.get("leisure"), 1)
-                # insert into companies
                 if self.writeProperty in object["properties"].keys():
                     object["properties"][self.writeProperty].append(leisureEntry)
         return object
@@ -246,7 +257,7 @@ class EducationAggregator(BaseAnnotator):
                 existingEntries = properties.get("education")
                 # preventing to have ("XY", kindergarten, 1) and ("Not named", kindergarten, 1)
                 for existingName, existingType, _ in existingEntries:
-                    if existingType == buildingType and entry[1] in ["Not named", existingName]:
+                    if existingType == buildingType and entry[0] in ["Not named", existingName]:
                         return object
                 object["properties"]["education"].append(entry)
             else:
@@ -274,7 +285,7 @@ class SafetyAggregator(BaseAnnotator):
                 existingEntries = properties.get("safety")
                 # preventing to have ("XY", police, 1) and ("Not named", police, 1)
                 for existingName, existingType, _ in existingEntries:
-                    if existingType == buildingType and entry._1 in ["Not named", existingName]:
+                    if existingType == buildingType and entry[1] in ["Not named", existingName]:
                         return object
                 object["properties"]["safety"].append(entry)
             else:

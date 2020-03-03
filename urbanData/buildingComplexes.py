@@ -334,17 +334,17 @@ if __name__ == "__main__":
     postalCodes = ["01127", "01139"]
     
     # TODO: clarify dependencies between them
-    annotater = [AddressAnnotator(areaOfInterest), 
-                BuildingLvlAnnotator(), 
-                CompanyAnnotator(postalCodes=postalCodes),
-                 OsmCompaniesAnnotator(
-                     areaOfInterest, OsmObjectType.WAYANDNODE),
-                LandUseAnnotator(areaOfInterest, OsmObjectType.WAY),
-                LeisureAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), 
-                AmentiyAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE), 
-                BuildingTypeClassifier(),
-                SafetyAggregator(), 
-                EducationAggregator()]
+    # safe bet : do not change the order !
+    annotater = [AddressAnnotator(areaOfInterest),
+                 BuildingLvlAnnotator(),
+                 CompanyAnnotator(postalCodes=postalCodes),
+                 OsmCompaniesAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE),
+                 LandUseAnnotator(areaOfInterest, OsmObjectType.WAY),
+                 LeisureAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE),
+                 AmentiyAnnotator(areaOfInterest, OsmObjectType.WAYANDNODE),
+                 BuildingTypeClassifier(),
+                 SafetyAggregator(),
+                 EducationAggregator()]
 
     for annotator in annotater:
         logging.info("Starting {}".format(annotator.__class__.__name__))
@@ -356,7 +356,7 @@ if __name__ == "__main__":
     for name, regions in regionsPerApproach.items():
         annotateArea(buildings, groups, regions, name)
 
-    logging.info("save complexes and regions")
+    logging.info("save groups and regions")
 
     with open("out/data/buildings_pieschen.json", 'w', encoding='UTF-8') as outfile:
             geojson.dump(buildings, outfile)
