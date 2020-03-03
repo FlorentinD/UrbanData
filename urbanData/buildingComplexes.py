@@ -8,8 +8,9 @@ import networkx as nx
 from funcy import log_durations
 
 
-from shapely.geometry import Polygon, LineString, mapping, shape, MultiPolygon
-from shapely.ops import unary_union, transform, nearest_points
+from shapely.geometry import Polygon, LineString, mapping, shape, MultiPolygon, MultiLineString
+from shapely.geometry.base import BaseMultipartGeometry
+from shapely.ops import unary_union, transform, nearest_points, split
 from shapely.strtree import STRtree
 from OSMPythonTools.nominatim import Nominatim
 
@@ -72,34 +73,62 @@ def buildGroups(buildings):
 
     return geojson.FeatureCollection(buildingGroups)
 
+def refinedConvexHull(shapesInRegion, borderGeoms):
+    """
+        tries to cut the convex hull based on the borders
+    """
+    regionShape = shapesInRegion.convex_hull
+    # TODO: this does not work yet as linesegments are not complete (maybe need to union street segments into one)
+    shapesForRefinement = unary_union(borderGeoms)
+    if isinstance(shapesForRefinement, LineString):
+        shapesForRefinement = [shapesForRefinement]
+    elif not isinstance(shapesForRefinement, BaseMultipartGeometry):
+        raise ValueError(type(shapesForRefinement))
+    for singleLine in shapesForRefinement:
+        polygonSplits = split(regionShape, singleLine)
+        # as the region contains every buildingGroup
+        regionPolygons = [s for s in polygonSplits if s.contains(shapesInRegion[0])]
+                
+        if len(regionPolygons) == 1:
+            regionShape = regionPolygons[0]
+        else:
+            raise ValueError("Borders should not split a region into more than one valid region")
+    return regionShape
 
-def componentsToRegions(regionComponents, buildingGroupGraph, buildingGroups, name):
+def getStreetReference(streetProperties, default):
+    """"
+        get the name/ref of a street
+    """
+    return streetProperties.get(
+                "name",
+                streetProperties.get(
+                    "ref",
+                    "border{}".format(default)
+                ))
+
+def componentsToRegions(regionComponents, buildingGroupGraph, buildingGroups, borders, name):
     """
         graph components to regions (as a FeatureCollection)
     """
     buildingRegions = []
     for id, groupIds in enumerate(regionComponents):
-        groupsForRegion = [buildingGroups["features"][index] for index in groupIds]
-        groupForRegionGeometries = [shape(group["geometry"]) for group in groupsForRegion] 
-        regionShape = unary_union(groupForRegionGeometries).convex_hull
-        # TODO: use saved streets for this regions (for refining geometry) .. not only convex hull
-        # use shapely.ops.split for this (only works if street completly splits the polygon ... maybe union border shape before)
-        # only take geometry containing every building? 
         borderIndexes = set.union(*[buildingGroupGraph.node[index]['borders'] for index in groupIds])
-        regionBorders = [
-            borders["features"][index]["properties"].get(
-                "name",
-                borders["features"][index]["properties"].get(
-                    "ref",
-                    "border{}".format(index)
-                )) for index in borderIndexes]
+        regionBorders = [getStreetReference(borders["features"][index]["properties"], index) for index in borderIndexes]
         # removes duplicate street names (as streets often segmented by crossings)
         regionBorders = list(set(regionBorders))
-        groupIds = [group["properties"]["groupId"] for group in groupsForRegion]
+        
+        groupsForRegion = [buildingGroups["features"][index] for index in groupIds]
+        groupForRegionGeometries = [shape(group["geometry"]) for group in groupsForRegion] 
+        regionShape = unary_union(groupForRegionGeometries)
+        if isinstance(regionShape, MultiPolygon):
+            # TODO: get this to work
+            #allBorderGeoms = [shape(border["geometry"]) for index, border in enumerate(borders["features"]) if getStreetReference(border["properties"], index) in regionBorders]
+            #regionShape = refinedConvexHull(regionShape, allBorderGeoms)
+            regionShape = regionShape.convex_hull
 
         region = shapeGeomToGeoJson(regionShape, properties={
             "regionId": id, 
-            "__buildingGroups": groupIds, 
+            "__buildingGroups": list(groupIds), 
             "regionBorders": regionBorders
         })
         buildingRegions.append(region)
@@ -107,6 +136,7 @@ def componentsToRegions(regionComponents, buildingGroupGraph, buildingGroups, na
         for group in groupsForRegion:
             group["properties"][name + "regionId"] = id 
 
+    # TODO: tackle overlapping regionshapes (if not solved by previous)
     logging.info("Building Regions based on {}: {}".format(name, len(buildingRegions)))
     return geojson.FeatureCollection(buildingRegions)
 
@@ -186,7 +216,12 @@ def buildRegions(buildingGroups, borders, maxGroupDistance = 120):
     }
 
     logging.info("Building region feature collections")
-    regionFeatureGroups = {name: componentsToRegions(components, buildingGroupGraph, buildingGroups, name) for name, components in regionBuildingApproaches.items()}
+    regionFeatureGroups = {name: componentsToRegions(
+        components, 
+        buildingGroupGraph, 
+        buildingGroups, 
+        borders, 
+        name) for name, components in regionBuildingApproaches.items()}
     return regionFeatureGroups
     
 
