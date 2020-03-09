@@ -1,8 +1,15 @@
 # Urban Data Seminar
 
 This project was created as part of the `Urban Data Seminar` at the TU Dresden.
-It fetches data mostly from openstreetmap, but also from other sources as dvb for public transport, [TravelTime](https://app.traveltimeplatform.com/) for time maps and yellow pages as well as the handelsregister for additional data regarding companies. 
-Examples maps produced by the scripts explained in the following can be found [here](example_maps/).
+The idea is to help city planner by providing a tool for getting an overview over a specific area of interest, enabling more informed decision makings.
+On the one hand the planner gets an overview over buildings, possible groupings and compact descriptions of them, as further explained in this [section](#buildingcomplexes).
+Besides information about buildings in a given area, also city patterns are visualized in another map as described in this. 
+The patterns are based on the describtions from [_A Pattern Language_](https://en.wikipedia.org/wiki/A_Pattern_Language) by Christoph Alexanders, where 253 patterns are explained.
+These observations-based patterns are seen as an idea how people should design their homes, streets, and communities.
+Many of the patterns are quite vague and hard to map to concrete data, hence they were interpreted as explained in [section](#city-patterns).
+
+It is based on data mostly from openstreetmap, but also from other sources including: dvb for public transport, [TravelTime](https://app.traveltimeplatform.com/) for time maps and yellow pages as well as the handelsregister for additional data regarding companies. 
+_Examples maps_ produced by the scripts explained in the following can be found [here](example_maps/).
 Each map has a layer control at the upper right, where you can enable and disable individual layers as well as changing the base-tiles.
 
 1. [Content/Scripts](#contentscripts)
